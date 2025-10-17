@@ -30,7 +30,7 @@ function createMainWindow() {
     mainWindow = null;
   });
 }
-
+ 
 app.whenReady().then(createMainWindow);
 
 app.on('window-all-closed', () => {

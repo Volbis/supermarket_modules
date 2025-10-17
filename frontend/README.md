@@ -72,7 +72,7 @@ Suivi des mouvements de stock par utilisateur et par date.
 | Composant                          | Technologie                           |
 | ---------------------------------- | ------------------------------------- |
 | **Back-end**                       | Django (Python) ou Spring Boot (Java) |
-| **Front-end**                      | React.js ou Angular                   |
+| **Front-end**                      | VueJS                  |
 | **Base de Données**                | PostgreSQL ou MySQL                   |
 | **API**                            | RESTful                               |
 | **Sécurité**                       | OAuth2 / JWT                          |
