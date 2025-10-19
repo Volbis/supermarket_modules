@@ -1,4 +1,5 @@
 const { app, BrowserWindow } = require('electron');
+const path = require('path');
 
 let mainWindow;
 
@@ -10,20 +11,24 @@ function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    show: true,
+    show: false,
   });
 
-  const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:8081';
+  // En mode développement → on charge localhost
+  // En production → on charge le fichier dist/index.html
+  const startUrl = process.env.ELECTRON_START_URL
+    ? process.env.ELECTRON_START_URL
+    : `file://${path.join(__dirname, '..', 'frontend', 'dist', 'index.html')}`;
+
   mainWindow.loadURL(startUrl);
+
+  // Facultatif : afficher les DevTools en mode développement uniquement
+  if (process.env.ELECTRON_START_URL) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-  });
-
-  mainWindow.webContents.once('did-finish-load', () => {
-    if (!mainWindow.isVisible()) {
-      mainWindow.show();
-    }
   });
 
   mainWindow.on('closed', () => {
