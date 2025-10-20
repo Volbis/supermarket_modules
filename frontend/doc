@@ -1,0 +1,8 @@
+fusionner une branch avec la main 
+
+git pull origin main     --- pour avoir la dernière version de la branch qui est sur github
+git checkout main           ---- change de branch
+git merge nom_de_ta_branche     ---- combine les deux
+git push origin main                ---- Renvoyer sur github
+
+

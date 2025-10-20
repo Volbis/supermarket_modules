@@ -2,6 +2,11 @@ const { defineConfig } = require('@vue/cli-service')
 
 module.exports = defineConfig({
   transpileDependencies: true,
+  devServer: {
+    port: 8081,
+    host: 'localhost',
+    open: false
+  },
   css: {
     loaderOptions: {
       postcss: {
