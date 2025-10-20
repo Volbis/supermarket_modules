@@ -1,0 +1,355 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==================== RESET ==================== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', sans-serif;
+  background-color: #f9fafb;
+  overflow: hidden;
+}
+
+/* ==================== LAYOUT PRINCIPAL ==================== */
+.app-container {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #f9fafb;
+}
+
+/* ==================== SIDEBAR ==================== */
+.sidebar {
+  width: 288px;
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Logo section */
+.logo-section {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+
+
+/* Navigation menu */
+.nav-menu {
+  flex: 1;
+  padding: 12px 16px;
+  overflow-y: auto;
+}
+
+.nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  margin-bottom: 2px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.nav-item.active {
+  background-color: #f3f4f6;
+  color: #111827;
+  font-weight: 500;
+}
+
+.nav-icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+}
+
+/* User section */
+.user-section {
+  padding: 12px 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.user-name {
+  font-weight: 500;
+  font-size: 15px;
+  color: #111827;
+}
+
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.logout-btn:hover {
+  background-color: #f3f4f6;
+  color: #6b7280;
+}
+
+/* ==================== MAIN CONTENT ==================== */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #f9fafb;
+}
+
+/* Header SANS bordure en bas */
+.header {
+  background-color: #f9fafb;  /* ← MÊME couleur que le fond */
+  border-bottom: none;  /* ← PAS DE BORDURE */
+  padding: 28px 40px 20px 40px;  /* Moins de padding en bas */
+}
+
+.header-content {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.header-title h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+
+.header-subtitle {
+  color: #6b7280;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  color: #6b7280;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.refresh-btn:hover {
+  background-color: #f9fafb;
+  border-color: #d1d5db;
+}
+
+/* ==================== DASHBOARD CARDS ==================== */
+.dashboard-content {
+  padding: 20px 40px 32px 40px;  /* Moins de padding en haut */
+}
+
+.cards-grid-top {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.cards-grid-bottom {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.dashboard-card {
+  background-color: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.06);  /* Ombre plus visible */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.dashboard-card:hover {
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.1);
+  border-color: #d1d5db;
+  transform: translateY(-2px);
+}
+
+.card-top {
+  height: 180px;
+}
+
+.card-bottom {
+  height: 220px;
+}
+
+/* ==================== ICÔNES PNG ==================== */
+.nav-icon-img {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+  object-fit: contain;
+}
+
+.nav-item:hover .nav-icon-img {
+  opacity: 0.85;
+}
+
+.nav-item.active .nav-icon-img {
+  opacity: 1;
+}
+
+.logout-btn .nav-icon-img {
+  opacity: 0.5;
+}
+
+.logout-btn:hover .nav-icon-img {
+  opacity: 0.7;
+}
+
+.refresh-icon {
+  width: 18px;
+  height: 18px;
+  opacity: 0.7;
+  object-fit: contain;
+}
+
+.refresh-btn:hover .refresh-icon {
+  opacity: 1;
+}
+
+/* ==================== SCROLLBAR ==================== */
+.nav-menu::-webkit-scrollbar,
+.main-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.nav-menu::-webkit-scrollbar-track,
+.main-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.nav-menu::-webkit-scrollbar-thumb,
+.main-content::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 10px;
+}
+
+.nav-menu::-webkit-scrollbar-thumb:hover,
+.main-content::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ==================== LOGO ==================== */
+/* ==================== LOGO (CORRIGÉ) ==================== */
+.logo-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Icône "EM" : fond blanc, texte en dégradé (E bleu / M rouge) */
+.logo-icon {
+  width: 44px;
+  height: 44px;
+  background: #ffffff;                /* fond blanc inchangé */
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.5px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e5e7eb;
+  flex-shrink: 0;
+  /* Dégradé appliqué au texte pour colorer E (gauche) en bleu et M (droite) en rouge */
+  background-image: linear-gradient(90deg, #2563eb 0%, #2563eb 50%, #ef4444 50%, #ef4444 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* Pour compatibilité Windows/Electron */
+  -webkit-text-fill-color: transparent;
+}
+
+/* Texte ExpressMall à droite : Express bleu, Mall rouge via dégradé textuel */
+.logo-text {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  /* Dégradé horizontal approximatif : première partie bleu, deuxième partie rouge */
+  background-image: linear-gradient(90deg, #2563eb 0%, #2563eb 58%, #ef4444 58%, #ef4444 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Si le texte a une casse ou espacement inattendu, on s'assure d'un espacement correct */
+.logo-text {
+  white-space: nowrap;
+}
