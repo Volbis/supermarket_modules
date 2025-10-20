@@ -1,4 +1,4 @@
-fusionner une branch avec la main 
+fusionner une branch avec la main (Tu veux mettre main à jour avec ta branch)
 
 git pull origin main     --- pour avoir la dernière version de la branch qui est sur github
 git checkout main           ---- change de branch
@@ -6,3 +6,6 @@ git merge nom_de_ta_branche     ---- combine les deux
 git push origin main                ---- Renvoyer sur github
 
 
+
+// Sous linux
+Donner la priorité à sandbox 
