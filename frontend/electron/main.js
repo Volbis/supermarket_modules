@@ -10,6 +10,7 @@ function createMainWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: false, // Désactive le sandbox pour éviter l'erreur
     },
     show: false,
   });
