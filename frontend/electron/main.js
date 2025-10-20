@@ -32,7 +32,7 @@ function createMainWindow() {
     mainWindow.show();
   });
 
-  mainWindow.on('closed', () => {
+  mainWindow.on('closed', () => { 
     mainWindow = null;
   });
 }
