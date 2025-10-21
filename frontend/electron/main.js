@@ -32,11 +32,11 @@ function createMainWindow() {
     mainWindow.show();
   });
 
-  mainWindow.on('closed', () => {
+  mainWindow.on('closed', () => { 
     mainWindow = null;
   });
 }
-
+ 
 app.whenReady().then(createMainWindow);
 
 app.on('window-all-closed', () => {

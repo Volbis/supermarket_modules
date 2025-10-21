@@ -9,7 +9,7 @@
           <span class="logo-text">ExpressMall</span>
         </div>
       </div>
-
+ 
       <!-- Navigation -->
       <nav class="nav-menu">
         <button
@@ -38,12 +38,12 @@
 
     <!-- Main content -->
     <main class="main-content">
-      <!-- Header -->
+      <!-- Header dynamique -->
       <header class="header">
         <div class="header-content">
           <div class="header-title">
-            <h1>Tableau de bord</h1>
-            <p class="header-subtitle">Bienvenue sur votre tableau de bord monsieur Déric</p>
+            <h1>{{ currentPage.title }}</h1>
+            <p class="header-subtitle">{{ currentPage.subtitle }}</p>
           </div>
           <button class="refresh-btn" @click="handleRefresh">
             <span>Actualiser</span>
@@ -52,73 +52,120 @@
         </div>
       </header>
 
-      <!-- Dashboard content -->
-      <div class="dashboard-content">
-        <div class="cards-grid-top">
-          <div v-for="i in 3" :key="'top-' + i" class="dashboard-card card-top">
-            Carte {{ i }}
-          </div>
-        </div>
-        
-        <div class="cards-grid-bottom">
-          <div v-for="i in 2" :key="'bottom-' + i" class="dashboard-card card-bottom">
-            Carte {{ i + 3 }}
-          </div>
-        </div>
+      <!-- Contenu dynamique -->
+      <div class="page-content">
+        <component :is="currentComponent" />
       </div>
     </main>
   </div>
 </template>
 
 <script>
+// Import des composants de vues
+import Statistics from '@/views/Statistics.vue'
+import Orders from '@/views/Orders.vue'
+import Notifications from '@/views/Notifications.vue'
+import Products from '@/views/Products.vue'
+import Suppliers from '@/views/Suppliers.vue'
+import Dashboard from '@/views/Dashboard.vue'
+
 export default {
   name: 'App',
+  components: {
+    Statistics,
+    Orders,
+    Notifications,
+    Products,
+    Suppliers,
+    Dashboard
+  },
   data() {
     return {
       // Icônes importées
       logoutIcon: require('@/assets/icons/deconnexion.png'),
       refreshIcon: require('@/assets/icons/refresh.png'),
       
-      // Menu items avec icônes
+      // Page actuelle
+      currentPage: {
+        title: 'Tableau de bord',
+        subtitle: 'Bienvenue sur votre tableau de bord monsieur Déric'
+      },
+      
+      // Menu items avec icônes et configuration
       menuItems: [
         { 
           name: 'Tableau de bord', 
           icon: require('@/assets/icons/tableau-bord.png'),
-          active: true 
+          active: true,
+          component: 'Dashboard',
+          title: 'Tableau de bord',
+          subtitle: 'Bienvenue sur votre tableau de bord monsieur Déric'
         },
         { 
           name: 'Statistiques', 
           icon: require('@/assets/icons/statistiques.png'),
-          active: false 
+          active: false,
+          component: 'Statistics',
+          title: 'Statistiques',
+          subtitle: 'Analysez les performances de votre magasin'
         },
         { 
           name: 'Commandes', 
           icon: require('@/assets/icons/commande.png'),
-          active: false 
+          active: false,
+          component: 'Orders',
+          title: 'Commandes',
+          subtitle: 'Gérez les commandes de vos clients'
         },
         { 
           name: 'Notifications', 
           icon: require('@/assets/icons/notifications.png'),
-          active: false 
+          active: false,
+          component: 'Notifications',
+          title: 'Notifications',
+          subtitle: 'Restez informé des dernières activités'
         },
         { 
           name: 'Produits', 
           icon: require('@/assets/icons/produit.png'),
-          active: false 
+          active: false,
+          component: 'Products',
+          title: 'Produits',
+          subtitle: 'Gérez votre inventaire de produits'
         },
         { 
           name: 'Fournisseurs', 
           icon: require('@/assets/icons/fournisseur.png'),
-          active: false 
+          active: false,
+          component: 'Suppliers',
+          title: 'Fournisseurs',
+          subtitle: 'Gérez vos partenaires fournisseurs'
         },
       ]
     }
   },
+  computed: {
+    currentComponent() {
+      const activeItem = this.menuItems.find(item => item.active)
+      return activeItem ? activeItem.component : 'Dashboard'
+    }
+  },
   methods: {
     handleMenuClick(menuName) {
+      // Mettre à jour l'état actif des éléments du menu
       this.menuItems.forEach(item => {
         item.active = item.name === menuName
       })
+      
+      // Mettre à jour la page actuelle
+      const selectedItem = this.menuItems.find(item => item.name === menuName)
+      if (selectedItem) {
+        this.currentPage = {
+          title: selectedItem.title,
+          subtitle: selectedItem.subtitle
+        }
+      }
+      
       console.log('Menu cliqué:', menuName)
     },
     

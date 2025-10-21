@@ -6,10 +6,11 @@
   "scripts": {
     "serve": "vue-cli-service serve --port 8081 --host localhost --no-open",
     "build": "vue-cli-service build",
-    "electron": "wait-on http-get://localhost:8081 && cross-env ELECTRON_START_URL=http://localhost:8081 npx electron ./electron/main.js",
+    "electron": "wait-on http-get://localhost:8081 && cross-env ELECTRON_START_URL=http://localhost:8081 npx electron ./electron/main.js --no sandbox",
     "electron:dev": "concurrently -k \"npm:serve\" \"npm:electron\""
   },
   "dependencies": {
+    "chart.js": "^4.5.1",
     "core-js": "^3.8.3",
     "vue": "^3.2.13",
     "vue-router": "^4.6.3"

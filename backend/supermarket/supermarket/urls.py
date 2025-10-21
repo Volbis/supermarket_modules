@@ -19,4 +19,8 @@ from django.urls import path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-]
+    path('api/gestion-stocks/', include('gestion_stocks.urls')),
+    path('api/users/', include('Users.urls')),
+] + static(settings.STATIC_URL, MEDIA_ROOT=settings.MEDIA_ROOT)
+
+
