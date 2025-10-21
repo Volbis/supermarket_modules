@@ -25,10 +25,10 @@
 
       <!-- User section -->
       <div class="user-section">
-        <div class="user-profile">
+        <button class="user-profile-btn" @click="goToSettings">
           <div class="user-avatar">DE</div>
           <span class="user-name">Déric EZIN</span>
-        </div>
+        </button>
         <button class="logout-btn" @click="handleLogout">
           <img :src="logoutIcon" alt="Déconnexion" class="nav-icon-img" />
           <span>Déconnexion</span>
@@ -68,6 +68,7 @@ import Notifications from '@/views/Notifications.vue'
 import Products from '@/views/Products.vue'
 import Suppliers from '@/views/Suppliers.vue'
 import Dashboard from '@/views/Dashboard.vue'
+import Settings from '@/views/Settings.vue' 
 
 export default {
   name: 'App',
@@ -77,21 +78,19 @@ export default {
     Notifications,
     Products,
     Suppliers,
-    Dashboard
+    Dashboard,
+    Settings
   },
   data() {
     return {
-      // Icônes importées
       logoutIcon: require('@/assets/icons/deconnexion.png'),
       refreshIcon: require('@/assets/icons/refresh.png'),
-      
-      // Page actuelle
+
       currentPage: {
         title: 'Tableau de bord',
         subtitle: 'Bienvenue sur votre tableau de bord monsieur Déric'
       },
-      
-      // Menu items avec icônes et configuration
+
       menuItems: [
         { 
           name: 'Tableau de bord', 
@@ -152,12 +151,15 @@ export default {
   },
   methods: {
     handleMenuClick(menuName) {
-      // Mettre à jour l'état actif des éléments du menu
+      // Supprimer l'item temporaire Paramètres s'il existe
+      this.menuItems = this.menuItems.filter(item => !item._isTemp)
+
+      // Mettre à jour l'état actif
       this.menuItems.forEach(item => {
         item.active = item.name === menuName
       })
-      
-      // Mettre à jour la page actuelle
+
+      // Mettre à jour currentPage
       const selectedItem = this.menuItems.find(item => item.name === menuName)
       if (selectedItem) {
         this.currentPage = {
@@ -165,16 +167,49 @@ export default {
           subtitle: selectedItem.subtitle
         }
       }
-      
+
       console.log('Menu cliqué:', menuName)
     },
-    
+
     handleLogout() {
       console.log('Déconnexion')
     },
-    
+
     handleRefresh() {
       console.log('Actualisation')
+    },
+
+    goToSettings() {
+      const existing = this.menuItems.find(i => i.component === 'Settings')
+      if (existing) {
+        this.menuItems.forEach(i => i.active = false)
+        existing.active = true
+        this.currentPage = { title: existing.title, subtitle: existing.subtitle }
+        return
+      }
+
+      // Ajouter temporairement l'item Paramètres
+      this.menuItems.forEach(i => i.active = false)
+      const tempSettings = {
+        name: 'Paramètres',
+        icon: require('@/assets/icons/parametres.png'),
+        active: true,
+        component: 'Settings',
+        title: 'Paramètres',
+        subtitle: 'Gérez vos préférences',
+        _isTemp: true
+      }
+      this.menuItems.push(tempSettings)
+      this.currentPage = {
+        title: tempSettings.title,
+        subtitle: tempSettings.subtitle
+      }
+    },
+
+    goToPage(item) {
+      this.menuItems.forEach(i => i.active = false)
+      item.active = true
+      this.currentPage = { title: item.title, subtitle: item.subtitle }
     }
   }
 }

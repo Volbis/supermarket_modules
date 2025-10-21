@@ -6,6 +6,7 @@ import Orders from '@/views/Orders.vue'
 import Statistics from '@/views/Statistics.vue'
 import Suppliers from '@/views/Suppliers.vue'
 import Notifications from '@/views/Notifications.vue'
+import Settings from '@/views/Settings.vue' 
 
 const routes = [
   {
@@ -37,7 +38,12 @@ const routes = [
     path: '/notifications',
     name: 'Notifications',
     component: Notifications
-  }
+  },
+  {
+    path: '/parametres',
+    name: 'Settings',
+    component: Settings
+  },
 ]
 
 const router = createRouter({
