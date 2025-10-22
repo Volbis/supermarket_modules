@@ -289,22 +289,22 @@ export default {
 
 .toast-notification.success {
   border-left-color: #10b981;
-  background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%);
+  background: #f0fdf4;
 }
 
 .toast-notification.warning {
   border-left-color: #f59e0b;
-  background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+  background: #fffbeb;
 }
 
 .toast-notification.error {
   border-left-color: #ef4444;
-  background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+  background: #fef2f2;
 }
 
 .toast-notification.info {
   border-left-color: #3b82f6;
-  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+  background: #eff6ff;
 }
 
 .toast-icon {
@@ -320,22 +320,22 @@ export default {
 }
 
 .toast-notification.success .toast-icon {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  background: #d1fae5;
   color: #059669;
 }
 
 .toast-notification.warning .toast-icon {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  background: #fef3c7;
   color: #d97706;
 }
 
 .toast-notification.error .toast-icon {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  background: #fee2e2;
   color: #dc2626;
 }
 
 .toast-notification.info .toast-icon {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  background: #dbeafe;
   color: #2563eb;
 }
 
@@ -416,7 +416,7 @@ export default {
 /* ==================== CONTAINER ==================== */
 .dashboard-content {
   padding: 32px 48px;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  background: #f3f4f6;
   min-height: 100vh;
 }
 
@@ -437,35 +437,17 @@ export default {
 /* ==================== DASHBOARD CARD ==================== */
 .dashboard-card {
   background: #ffffff;
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 28px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.dashboard-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e5e7eb;
+  transition: all 0.3s ease;
 }
 
 .dashboard-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08), 0 16px 40px rgba(0, 0, 0, 0.12);
-  transform: translateY(-6px);
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-.dashboard-card:hover::before {
-  opacity: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+  border-color: #d1d5db;
 }
 
 .card-top {
@@ -517,18 +499,18 @@ export default {
 }
 
 .sales-icon {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.35), 0 4px 12px rgba(37, 99, 235, 0.2);
+  background: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
 
 .orders-icon {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35), 0 4px 12px rgba(5, 150, 105, 0.2);
+  background: #10b981;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
 }
 
 .alert-icon {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.35), 0 4px 12px rgba(217, 119, 6, 0.2);
+  background: #f59e0b;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
   animation: shake 4s ease-in-out infinite;
 }
 
@@ -613,12 +595,11 @@ export default {
 }
 
 .view-details-btn {
-  padding: 5px 10px;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  color: #475569;
-  bottom: 50px;
+  padding: 8px 16px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #6b7280;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -626,11 +607,10 @@ export default {
 }
 
 .view-details-btn:hover {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: #3b82f6;
   color: white;
   border-color: #3b82f6;
   transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
 
 /* ==================== BAR CHART ==================== */
@@ -661,23 +641,21 @@ export default {
 
 .bar {
   width: 100%;
-  background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
-  border-radius: 10px 10px 0 0;
+  background: #3b82f6;
+  border-radius: 8px 8px 0 0;
   position: relative;
   min-height: 30px;
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.3s ease;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 10px;
-  box-shadow: 0 -4px 16px rgba(59, 130, 246, 0.25);
   cursor: pointer;
 }
 
 .bar:hover {
-  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
-  transform: scaleY(1.05) scaleX(1.08);
-  box-shadow: 0 -8px 24px rgba(37, 99, 235, 0.45);
+  background: #2563eb;
+  transform: scaleY(1.05) scaleX(1.05);
 }
 
 .bar-value {
@@ -710,31 +688,30 @@ export default {
   align-items: center;
   gap: 16px;
   padding: 16px 18px;
-  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-  border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.3s ease;
   cursor: pointer;
 }
 
 .order-item:hover {
   background: white;
   border-color: #3b82f6;
-  transform: translateX(6px) scale(1.02);
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
 }
 
 .order-icon {
   width: 48px;
   height: 48px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: #ffffff;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border: 1px solid #e5e7eb;
 }
 
 .order-icon img {
@@ -775,21 +752,20 @@ export default {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .status-badge.pending {
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  background: #fef3c7;
   color: #92400e;
 }
 
 .status-badge.confirmed {
-  background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+  background: #dbeafe;
   color: #1e40af;
 }
 
 .status-badge.delivered {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+  background: #d1fae5;
   color: #065f46;
 }
 
