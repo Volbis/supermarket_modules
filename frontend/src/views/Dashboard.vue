@@ -1,5 +1,26 @@
 <template>
   <div class="dashboard-content">
+    <!-- Toast Notifications -->
+    <transition-group name="toast" tag="div" class="toast-container">
+      <div
+        v-for="notification in visibleNotifications"
+        :key="notification.id"
+        :class="['toast-notification', notification.type]"
+      >
+        <div class="toast-icon">
+          <span v-if="notification.type === 'success'">✓</span>
+          <span v-else-if="notification.type === 'warning'">⚠️</span>
+          <span v-else-if="notification.type === 'info'">ℹ️</span>
+          <span v-else>✕</span>
+        </div>
+        <div class="toast-content">
+          <h4 class="toast-title">{{ notification.title }}</h4>
+          <p class="toast-message">{{ notification.message }}</p>
+        </div>
+        <button @click="dismissNotification(notification.id)" class="toast-close">×</button>
+      </div>
+    </transition-group>
+
     <!-- Cartes de statistiques (top) -->
     <div class="cards-grid-top">
       <!-- Carte 1: Ventes du jour -->
@@ -105,6 +126,10 @@ export default {
       pendingOrders: 8,
       lowStockItems: 12,
       
+      // Notifications toast
+      notifications: [],
+      notificationId: 0,
+      
       // Ventes de la semaine
       weekSales: [
         { day: 'Lun', amount: 850000 },
@@ -149,7 +174,58 @@ export default {
       ]
     }
   },
+  computed: {
+    visibleNotifications() {
+      return this.notifications.filter(n => n.visible)
+    }
+  },
+  mounted() {
+    // Afficher des notifications de bienvenue
+    setTimeout(() => {
+      this.showNotification('Bienvenue !', 'Tableau de bord chargé avec succès', 'success')
+    }, 500)
+    
+    setTimeout(() => {
+      this.showNotification('Attention', `${this.lowStockItems} produits en rupture de stock`, 'warning')
+    }, 2000)
+    
+    setTimeout(() => {
+      this.showNotification('Nouvelle commande', 'Commande #001 reçue de Supermarché Central', 'info')
+    }, 4000)
+  },
   methods: {
+    showNotification(title, message, type = 'info', duration = 5000) {
+      const id = this.notificationId++
+      const notification = {
+        id,
+        title,
+        message,
+        type,
+        visible: true
+      }
+      
+      this.notifications.push(notification)
+      
+      // Auto-dismiss après duration
+      setTimeout(() => {
+        this.dismissNotification(id)
+      }, duration)
+    },
+    
+    dismissNotification(id) {
+      const notification = this.notifications.find(n => n.id === id)
+      if (notification) {
+        notification.visible = false
+        // Supprimer complètement après l'animation
+        setTimeout(() => {
+          const index = this.notifications.findIndex(n => n.id === id)
+          if (index > -1) {
+            this.notifications.splice(index, 1)
+          }
+        }, 300)
+      }
+    },
+    
     formatCurrency(amount, short = false) {
       if (short) {
         if (amount >= 1000000) {
@@ -185,9 +261,153 @@ export default {
 </script>
 
 <style scoped>
+/* ==================== TOAST NOTIFICATIONS ==================== */
+.toast-container {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+}
+
+.toast-notification {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  border-left: 4px solid;
+  min-width: 320px;
+  animation: slideIn 0.3s ease-out;
+}
+
+.toast-notification.success {
+  border-left-color: #10b981;
+}
+
+.toast-notification.warning {
+  border-left-color: #f59e0b;
+}
+
+.toast-notification.error {
+  border-left-color: #ef4444;
+}
+
+.toast-notification.info {
+  border-left-color: #3b82f6;
+}
+
+.toast-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.toast-notification.success .toast-icon {
+  background: #d1fae5;
+  color: #10b981;
+}
+
+.toast-notification.warning .toast-icon {
+  background: #fef3c7;
+  color: #f59e0b;
+}
+
+.toast-notification.error .toast-icon {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.toast-notification.info .toast-icon {
+  background: #dbeafe;
+  color: #3b82f6;
+}
+
+.toast-content {
+  flex: 1;
+}
+
+.toast-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 4px;
+}
+
+.toast-message {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.toast-close {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* Toast animations */
+.toast-enter-active {
+  animation: slideIn 0.3s ease-out;
+}
+
+.toast-leave-active {
+  animation: slideOut 0.3s ease-in;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+}
+
 /* ==================== CONTAINER ==================== */
 .dashboard-content {
   padding: 20px 40px 32px 40px;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+  min-height: 100vh;
 }
 
 /* ==================== GRIDS ==================== */
@@ -211,12 +431,31 @@ export default {
   padding: 24px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   border: 1px solid #e5e7eb;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.dashboard-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
 .dashboard-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+  transform: translateY(-4px);
+  border-color: #3b82f6;
+}
+
+.dashboard-card:hover::before {
+  opacity: 1;
 }
 
 .card-top {
@@ -242,24 +481,52 @@ export default {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
 }
 
 .stat-icon img {
   width: 28px;
   height: 28px;
   object-fit: contain;
+  filter: brightness(0) invert(1);
 }
 
 .sales-icon {
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .orders-icon {
   background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
 }
 
 .alert-icon {
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  animation: shake 3s ease-in-out infinite;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-2px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(2px);
+  }
 }
 
 .stat-content {
@@ -279,6 +546,10 @@ export default {
   color: #111827;
   margin-bottom: 6px;
   line-height: 1;
+  background: linear-gradient(135deg, #111827 0%, #374151 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .stat-change {
@@ -363,16 +634,18 @@ export default {
   border-radius: 6px 6px 0 0;
   position: relative;
   min-height: 20px;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding-top: 8px;
+  box-shadow: 0 -2px 8px rgba(59, 130, 246, 0.2);
 }
 
 .bar:hover {
   background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
-  transform: scaleY(1.05);
+  transform: scaleY(1.08) scaleX(1.05);
+  box-shadow: 0 -4px 16px rgba(37, 99, 235, 0.4);
 }
 
 .bar-value {
@@ -402,12 +675,15 @@ export default {
   background: #f9fafb;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 
 .order-item:hover {
-  background: #f3f4f6;
-  border-color: #d1d5db;
+  background: white;
+  border-color: #3b82f6;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
 }
 
 .order-icon {
