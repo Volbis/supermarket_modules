@@ -37,6 +37,12 @@ router.register(r'historique-stock', HistoriqueStockViewSet, basename='historiqu
 router.register(r'responsables', ResponsableStockViewSet, basename='responsable')
 router.register(r'historique-ventes', HistoriqueVenteViewSet, basename='historique-vente')
 
+
+
+# Intégration des URLs du routeur
+urlpatterns = [
+    path('', include(router.urls)),
+]
 # ============================================================================
 # Pattern URLs
 # ============================================================================
@@ -46,7 +52,7 @@ Structure générale des URLs :
 API_ROOT: /api/
 
 CATEGORIES:
-  GET     /api/categories/                      - Lister tous les catégories
+  GET     /api/categories/                      - Listerr tous les catégories
   POST    /api/categories/                      - Créer une catégorie
   GET     /api/categories/{id}/                 - Détails d'une catégorie
   PUT     /api/categories/{id}/                 - Mettre à jour une catégorie
@@ -134,7 +140,4 @@ HISTORIQUE VENTES:
   GET     /api/historique-ventes/par-periode/list/ - Ventes par période
 """
 
-# Intégration des URLs du routeur
-urlpatterns = [
-    path('', include(router.urls)),
-]
+
