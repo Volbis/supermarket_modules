@@ -16,12 +16,15 @@
     "vue-router": "^4.6.3"
   },
   "devDependencies": {
-    "@babel/core": "^7.12.16",
+    "@babel/core": "^7.28.4",
     "@babel/eslint-parser": "^7.12.16",
+    "@babel/preset-env": "^7.28.3",
     "@vue/cli-plugin-babel": "~5.0.0",
     "@vue/cli-plugin-eslint": "~5.0.0",
     "@vue/cli-service": "~5.0.0",
     "autoprefixer": "^10.4.21",
+    "babel-eslint": "^10.1.0",
+    "babel-loader": "^10.0.0",
     "concurrently": "^9.0.0",
     "cross-env": "^10.1.0",
     "electron": "^31.0.0",
@@ -34,14 +37,31 @@
   "eslintConfig": {
     "root": true,
     "env": {
-      "node": true
+      "node": true,
+      "browser": true
     },
     "extends": [
       "plugin:vue/vue3-essential",
       "eslint:recommended"
     ],
+    "parser": "vue-eslint-parser",
     "parserOptions": {
-      "parser": "@babel/eslint-parser"
+      "parser": "@babel/eslint-parser",
+      "ecmaVersion": 2020,
+      "sourceType": "module",
+      "requireConfigFile": false,
+      "babelOptions": {
+        "presets": [
+          [
+            "@babel/preset-env",
+            {
+              "targets": {
+                "esmodules": true
+              }
+            }
+          ]
+        ]
+      }
     },
     "rules": {}
   },
