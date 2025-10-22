@@ -17,7 +17,7 @@ from .views import (
     AlertStockViewSet,
     HistoriqueStockViewSet,
     ResponsableStockViewSet,
-    HistoriqueVenteViewSet
+    HistoriqueVenteViewSet 
 )
 
 # ============================================================================
@@ -136,5 +136,5 @@ HISTORIQUE VENTES:
 
 # Intégration des URLs du routeur
 urlpatterns = [
-    path('api/', include(router.urls)),
+    path('', include(router.urls)),
 ]
