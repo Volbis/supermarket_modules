@@ -38,7 +38,7 @@
       <div class="stat-item">
         <div class="stat-icon value">💰</div>
         <div class="stat-details">
-          <span class="stat-value">{{ totalValue }}€</span>
+          <span class="stat-value">{{ totalValue }} CFA</span>
           <span class="stat-label">Valeur totale</span>
         </div>
       </div>
