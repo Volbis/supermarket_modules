@@ -3,25 +3,25 @@
     <!-- En-tête avec filtres -->
     <div class="page-header">
       <div class="filters-container">
-        <select v-model="dateFilter" @change="loadData" class="filter-select">
+        <select v-model="dateFilter" @change="loadStatistics" class="filter-select">
           <option value="7">7 derniers jours</option>
           <option value="30">30 derniers jours</option>
           <option value="90">90 derniers jours</option>
           <option value="365">1 an</option>
         </select>
         
-        <select v-model="categoryFilter" @change="applyFilters" class="filter-select">
+        <select v-model="categoryFilter" @change="loadStatistics" class="filter-select">
           <option value="all">Toutes catégories</option>
-          <option v-for="cat in categories" :key="cat.id_categorie" :value="cat.id_categorie">
-            {{ cat.nom }}
-          </option>
+          <option value="electronics">Électronique</option>
+          <option value="clothes">Vêtements</option>
+          <option value="food">Alimentaire</option>
         </select>
         
-        <select v-model="statusFilter" @change="applyFilters" class="filter-select">
+        <select v-model="statusFilter" @change="loadStatistics" class="filter-select">
           <option value="all">Tous statuts</option>
-          <option value="EN_COURS">En cours</option>
-          <option value="LIVREE">Livrées</option>
-          <option value="ANNULEE">Annulées</option>
+          <option value="delivered">Livrées</option>
+          <option value="pending">En cours</option>
+          <option value="cancelled">Annulées</option>
         </select>
         
         <button class="export-btn" @click="exportData">
@@ -30,10 +30,10 @@
       </div>
     </div>
 
-    <!-- Indicateur de chargement -->
-    <div v-if="loading" class="loading-container">
+    <!-- État de chargement -->
+    <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
-      <p>Chargement des données...</p>
+      <p>Chargement des statistiques...</p>
     </div>
 
     <!-- Contenu principal -->
@@ -44,8 +44,8 @@
           <div class="kpi-content">
             <div class="kpi-info">
               <p class="kpi-label">Total Commandes</p>
-              <h3 class="kpi-value">{{ totalCommandes }}</h3>
-              <span class="kpi-trend positive">↗ {{ commandesTrend }}%</span>
+              <h3 class="kpi-value">{{ filteredOrdersCount }}</h3>
+              <span class="kpi-trend positive">↗ +{{ calculateGrowth('orders') }}%</span>
             </div>
             <div class="kpi-icon">🛒</div>
           </div>
@@ -56,7 +56,7 @@
             <div class="kpi-info">
               <p class="kpi-label">Revenus Totaux</p>
               <h3 class="kpi-value">{{ formatCurrency(totalRevenue) }}</h3>
-              <span class="kpi-trend positive">↗ {{ revenueTrend }}%</span>
+              <span class="kpi-trend positive">↗ +{{ calculateGrowth('revenue') }}%</span>
             </div>
             <div class="kpi-icon">💰</div>
           </div>
@@ -65,11 +65,9 @@
         <div class="dashboard-card card-kpi kpi-purple">
           <div class="kpi-content">
             <div class="kpi-info">
-              <p class="kpi-label">Produits Actifs</p>
-              <h3 class="kpi-value">{{ totalProduits }}</h3>
-              <span class="kpi-trend" :class="stockTrend >= 0 ? 'positive' : 'negative'">
-                {{ stockTrend >= 0 ? '↗' : '↘' }} {{ Math.abs(stockTrend) }}%
-              </span>
+              <p class="kpi-label">Produits Vendus</p>
+              <h3 class="kpi-value">{{ totalProductsSold }}</h3>
+              <span class="kpi-trend positive">↗ +{{ calculateGrowth('products') }}%</span>
             </div>
             <div class="kpi-icon">📦</div>
           </div>
@@ -89,17 +87,9 @@
 
           <!-- Indicateurs clés -->
           <div class="stats-grid">
-            <div class="stat-box">
-              <span class="label">Panier moyen</span>
-              <span class="value">{{ formatCurrency(averageBasket) }}</span>
-            </div>
-            <div class="stat-box">
-              <span class="label">Taux conversion</span>
-              <span class="value">{{ conversionRate }}%</span>
-            </div>
-            <div class="stat-box">
-              <span class="label">Commandes/jour</span>
-              <span class="value">{{ ordersPerDay }}</span>
+            <div class="stat-box" v-for="(item, idx) in keyStats" :key="idx">
+              <span class="label">{{ item.label }}</span>
+              <span class="value">{{ item.value }}</span>
             </div>
           </div>
 
@@ -125,67 +115,26 @@
           </div>
         </div>
 
-        <!-- Statistiques Ventes -->        
-        <h3 class="card-title-centered">💰 Historique des Ventes</h3>
+        <!-- Statistiques Produits -->        
+        <h3 class="card-title-centered">📦 Statistiques des Produits</h3>
 
         <div class="dashboard-card chart-card">
-          <!-- Graphique évolution des ventes -->
-          <div class="chart-section">
-            <canvas ref="ventesChart"></canvas>
+          <!-- Graphique répartition -->
+          <div class="chart-container">
+            <canvas ref="productsChart"></canvas>
           </div>
           
-          <!-- Top produits vendus -->
+          <!-- Top produits -->
           <div class="top-products">
-            <h4 class="section-subtitle">Top 5 Produits les Plus Vendus</h4>
+            <h4 class="section-subtitle">Top 5 Produits</h4>
             <div class="products-list">
-              <div v-for="(product, index) in topProductsVendus" :key="index" class="product-item">
+              <div v-for="(product, index) in topProducts" :key="index" class="product-item">
                 <div class="product-rank">{{ index + 1 }}</div>
                 <div class="product-info">
-                  <span class="product-name">{{ product.nom }}</span>
-                  <span class="product-sales">{{ product.quantite_totale }} unités vendues</span>
+                  <span class="product-name">{{ product.name }}</span>
+                  <span class="product-sales">{{ product.sales }} ventes</span>
                 </div>
-                <span class="product-revenue">{{ formatCurrency(product.chiffre_affaires) }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Statistiques Stock -->        
-        <h3 class="card-title-centered">📦 Mouvements de Stock</h3>
-
-        <div class="dashboard-card chart-card">
-          <div class="chart-section">
-            <canvas ref="stockChart"></canvas>
-          </div>
-          
-          <!-- Statistiques stock -->
-          <div class="stock-stats">
-            <div class="stat-card stat-ajout">
-              <div class="stat-icon">📈</div>
-              <div class="stat-details">
-                <span class="stat-label">Total Ajouts</span>
-                <span class="stat-value">{{ totalAjouts }}</span>
-                <span class="stat-subtitle">{{ ajoutsCount }} opérations</span>
-              </div>
-            </div>
-            
-            <div class="stat-card stat-retrait">
-              <div class="stat-icon">📉</div>
-              <div class="stat-details">
-                <span class="stat-label">Total Retraits</span>
-                <span class="stat-value">{{ totalRetraits }}</span>
-                <span class="stat-subtitle">{{ retraitsCount }} opérations</span>
-              </div>
-            </div>
-            
-            <div class="stat-card stat-bilan">
-              <div class="stat-icon">⚖️</div>
-              <div class="stat-details">
-                <span class="stat-label">Bilan Net</span>
-                <span class="stat-value" :class="bilanNet >= 0 ? 'positive' : 'negative'">
-                  {{ bilanNet >= 0 ? '+' : '' }}{{ bilanNet }}
-                </span>
-                <span class="stat-subtitle">Différence ajouts/retraits</span>
+                <span class="product-revenue">{{ formatCurrency(product.revenue) }}</span>
               </div>
             </div>
           </div>
@@ -207,20 +156,26 @@
                 <thead>
                   <tr>
                     <th>Fournisseur</th>
-                    <th>Produits</th>
                     <th>Commandes</th>
-                    <th>Délai</th>
+                    <th>Fiabilité</th>
+                    <th>Délai moyen</th>
                     <th>Statut</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="supplier in fournisseurs" :key="supplier.id_fournisseur">
-                    <td class="supplier-name">{{ supplier.nom }}</td>
-                    <td>{{ supplier.nombre_produits }}</td>
-                    <td>{{ supplier.nombre_commandes }}</td>
-                    <td>{{ supplier.delais_livraison_jours }}j</td>
+                  <tr v-for="supplier in suppliers" :key="supplier.name">
+                    <td class="supplier-name">{{ supplier.name }}</td>
+                    <td>{{ supplier.orders }}</td>
                     <td>
-                      <span class="status-badge active">Actif</span>
+                      <div class="reliability-badge" :class="getReliabilityClass(supplier.reliability)">
+                        {{ supplier.reliability }}%
+                      </div>
+                    </td>
+                    <td>{{ supplier.avgDelay }}j</td>
+                    <td>
+                      <span class="status-badge" :class="supplier.status">
+                        {{ supplier.statusLabel }}
+                      </span>
                     </td>
                   </tr>
                 </tbody>
@@ -235,12 +190,8 @@
 
 <script>
 import Chart from 'chart.js/auto';
-import historiqueVentesAPI from '../services/historiqueVentesAPI';
-import historiqueStockAPI from '../services/historiqueStockAPI';
-import produitsAPI from '../services/produitsAPI';
-import commandesAPI from '../services/commandesAPI';
-import fournisseursAPI from '../services/fournisseursAPI';
-import categoriesAPI from '../services/categoriesAPI';
+import historiqueVentesAPI from '@/services/historiqueVentesAPI';
+import historiqueStockAPI from '@/services/historiqueStockAPI';
 
 export default {
   name: 'StatisticsView',
@@ -252,49 +203,57 @@ export default {
       statusFilter: 'all',
       
       // Données brutes de l'API
-      historiqueVentes: [],
-      historiqueStock: [],
-      produits: [],
-      commandes: [],
-      fournisseurs: [],
-      categories: [],
+      ventesData: [],
+      stockData: [],
       
-      // KPI calculés
-      totalCommandes: 0,
+      // Données KPI
+      filteredOrdersCount: 0,
       totalRevenue: 0,
-      totalProduits: 0,
+      totalProductsSold: 0,
       averageBasket: 0,
-      conversionRate: 0,
+      conversionRate: 3.2,
       ordersPerDay: 0,
-      commandesTrend: 0,
-      revenueTrend: 0,
-      stockTrend: 0,
       
-      // Données de ventes
-      topProductsVendus: [],
-      ventesParMois: [],
-      
-      // Données de stock
-      totalAjouts: 0,
-      totalRetraits: 0,
-      ajoutsCount: 0,
-      retraitsCount: 0,
-      bilanNet: 0,
-      mouvementsParMois: [],
+      // Croissance (comparaison période précédente)
+      previousPeriodData: {
+        orders: 0,
+        revenue: 0,
+        products: 0
+      },
       
       // Statuts commandes
-      orderStatuses: [],
+      orderStatuses: [
+        { name: 'Livrées', count: 0, percentage: 0, color: '#10B981' },
+        { name: 'En cours', count: 0, percentage: 0, color: '#3B82F6' },
+        { name: 'En attente', count: 0, percentage: 0, color: '#F59E0B' },
+        { name: 'Annulées', count: 0, percentage: 0, color: '#EF4444' }
+      ],
       
-      // Instances de graphiques
+      // Top produits
+      topProducts: [],
+      
+      // Fournisseurs
+      suppliers: [],
+      
+      // Graphiques
       ordersChartInstance: null,
-      ventesChartInstance: null,
-      stockChartInstance: null,
+      productsChartInstance: null,
       suppliersChartInstance: null
     };
   },
   
-  async mounted() {
-    await this.loadData();
+  computed: {
+    keyStats() {
+      return [
+        { label: 'Panier Moyen', value: this.formatCurrency(this.averageBasket) },
+        { label: 'Commandes/jour', value: this.ordersPerDay.toFixed(1) },
+        { label: 'Taux conversion', value: `${this.conversionRate}%` }
+      ];
+    }
+  },
+  
+  mounted() {
+    this.loadStatistics();
   },
   
   beforeUnmount() {
@@ -302,284 +261,184 @@ export default {
   },
   
   methods: {
-    async loadData() {
+    async loadStatistics() {
       this.loading = true;
       try {
-        // Charger toutes les données en parallèle
-        const [ventesRes, stockRes, produitsRes, commandesRes, fournisseursRes, categoriesRes] = await Promise.all([
-          historiqueVentesAPI.getAllHistoriqueVentes(),
-          historiqueStockAPI.getAllHistoriqueStock(),
-          produitsAPI.getAllProduits(),
-          commandesAPI.getAllCommandes(),
-          fournisseursAPI.getAllFournisseurs(),
-          categoriesAPI.getAllCategories()
-        ]);
+        // Calculer les dates selon le filtre
+        const { dateDebut, dateFin } = this.calculateDateRange();
         
-        this.historiqueVentes = ventesRes.data;
-        this.historiqueStock = stockRes.data;
-        this.produits = produitsRes.data;
-        this.commandes = commandesRes.data;
-        this.fournisseurs = fournisseursRes.data;
-        this.categories = categoriesRes.data;
+        // Charger les données de ventes
+        const ventesResponse = await historiqueVentesAPI.getVentesByPeriode(dateDebut, dateFin);
+        this.ventesData = ventesResponse.data.ventes || [];
+        
+        // Charger les données d'historique stock
+        const stockResponse = await historiqueStockAPI.getAllHistoriqueStock();
+        this.stockData = stockResponse.data || [];
         
         // Calculer les statistiques
         this.calculateKPIs();
-        this.calculateVentesStats();
-        this.calculateStockStats();
-        this.calculateCommandesStats();
-        this.prepareFournisseursData();
+        this.calculateTopProducts();
+        this.calculateOrderStatuses();
         
-        // Créer les graphiques après un court délai pour s'assurer que le DOM est prêt
+        // Charger les fournisseurs (données simulées pour l'instant)
+        this.loadSuppliersData();
+        
+        // Mettre à jour les graphiques
         this.$nextTick(() => {
           this.destroyCharts();
           this.initCharts();
         });
         
       } catch (error) {
-        console.error('Erreur lors du chargement des données:', error);
-        alert('Erreur lors du chargement des statistiques');
+        console.error('Erreur lors du chargement des statistiques:', error);
+        this.$toast?.error('Erreur lors du chargement des statistiques');
       } finally {
         this.loading = false;
       }
     },
     
+    calculateDateRange() {
+      const dateFin = new Date();
+      const dateDebut = new Date();
+      dateDebut.setDate(dateFin.getDate() - parseInt(this.dateFilter));
+      
+      return {
+        dateDebut: this.formatDate(dateDebut),
+        dateFin: this.formatDate(dateFin)
+      };
+    },
+    
+    formatDate(date) {
+      return date.toISOString().split('T')[0];
+    },
+    
     calculateKPIs() {
-      // Filtrer par période
-      const dateLimit = this.getDateLimit();
-      const ventesFiltered = this.historiqueVentes.filter(v => 
-        new Date(v.date_vente) >= dateLimit
-      );
-      const commandesFiltered = this.commandes.filter(c => 
-        new Date(c.date_commande) >= dateLimit
-      );
+      // Nombre total de commandes (transactions)
+      this.filteredOrdersCount = this.ventesData.length;
       
-      // Total commandes
-      this.totalCommandes = commandesFiltered.length;
+      // Revenus totaux
+      this.totalRevenue = this.ventesData.reduce((sum, vente) => {
+        return sum + parseFloat(vente.montant_total || 0);
+      }, 0);
       
-      // Total revenus
-      this.totalRevenue = ventesFiltered.reduce((sum, v) => 
-        sum + parseFloat(v.montant_total || 0), 0
-      );
-      
-      // Total produits
-      this.totalProduits = this.produits.length;
+      // Produits vendus
+      this.totalProductsSold = this.ventesData.reduce((sum, vente) => {
+        return sum + parseInt(vente.quantite_vendue || 0);
+      }, 0);
       
       // Panier moyen
-      this.averageBasket = ventesFiltered.length > 0 
-        ? this.totalRevenue / ventesFiltered.length 
+      this.averageBasket = this.filteredOrdersCount > 0 
+        ? this.totalRevenue / this.filteredOrdersCount 
         : 0;
       
       // Commandes par jour
       const days = parseInt(this.dateFilter);
-      this.ordersPerDay = (this.totalCommandes / days).toFixed(1);
-      
-      // Taux de conversion (simulé)
-      this.conversionRate = (Math.random() * 5 + 2).toFixed(1);
-      
-      // Trends (comparaison avec période précédente - simulé)
-      this.commandesTrend = (Math.random() * 20 + 5).toFixed(1);
-      this.revenueTrend = (Math.random() * 25 + 10).toFixed(1);
-      this.stockTrend = (Math.random() * 10 - 2).toFixed(1);
+      this.ordersPerDay = days > 0 ? this.filteredOrdersCount / days : 0;
     },
     
-    calculateVentesStats() {
-      const dateLimit = this.getDateLimit();
-      const ventesFiltered = this.historiqueVentes.filter(v => 
-        new Date(v.date_vente) >= dateLimit
-      );
+    calculateTopProducts() {
+      // Grouper les ventes par produit
+      const productMap = {};
       
-      // Top produits vendus
-      const produitsMap = {};
-      ventesFiltered.forEach(vente => {
-        const produitId = vente.produit;
-        if (!produitsMap[produitId]) {
-          const produit = this.produits.find(p => p.id_product === produitId);
-          produitsMap[produitId] = {
-            nom: produit ? produit.nom : 'Produit inconnu',
-            quantite_totale: 0,
-            chiffre_affaires: 0
+      this.ventesData.forEach(vente => {
+        const produitNom = vente.produit_nom || 'Produit inconnu';
+        
+        if (!productMap[produitNom]) {
+          productMap[produitNom] = {
+            name: produitNom,
+            sales: 0,
+            revenue: 0
           };
         }
-        produitsMap[produitId].quantite_totale += vente.quantite_vendue;
-        produitsMap[produitId].chiffre_affaires += parseFloat(vente.montant_total || 0);
+        
+        productMap[produitNom].sales += parseInt(vente.quantite_vendue || 0);
+        productMap[produitNom].revenue += parseFloat(vente.montant_total || 0);
       });
       
-      this.topProductsVendus = Object.values(produitsMap)
-        .sort((a, b) => b.quantite_totale - a.quantite_totale)
+      // Convertir en tableau et trier par revenus
+      this.topProducts = Object.values(productMap)
+        .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 5);
-      
-      // Ventes par mois
-      this.ventesParMois = this.groupByMonth(ventesFiltered, 'date_vente');
     },
     
-    calculateStockStats() {
-      const dateLimit = this.getDateLimit();
-      const stockFiltered = this.historiqueStock.filter(h => 
-        new Date(h.date_modification) >= dateLimit
-      );
+    calculateOrderStatuses() {
+      // Simulation de répartition des statuts (à adapter selon vos données)
+      const total = this.filteredOrdersCount;
       
-      // Calculs totaux
-      const ajouts = stockFiltered.filter(h => h.type_modification === 'AJOUT');
-      const retraits = stockFiltered.filter(h => h.type_modification === 'RETRAIT');
+      this.orderStatuses[0].count = Math.floor(total * 0.64); // Livrées
+      this.orderStatuses[1].count = Math.floor(total * 0.23); // En cours
+      this.orderStatuses[2].count = Math.floor(total * 0.10); // En attente
+      this.orderStatuses[3].count = total - this.orderStatuses[0].count - 
+                                     this.orderStatuses[1].count - 
+                                     this.orderStatuses[2].count; // Annulées
       
-      this.totalAjouts = ajouts.reduce((sum, h) => sum + h.quantite_modifiee, 0);
-      this.totalRetraits = retraits.reduce((sum, h) => sum + h.quantite_modifiee, 0);
-      this.ajoutsCount = ajouts.length;
-      this.retraitsCount = retraits.length;
-      this.bilanNet = this.totalAjouts - this.totalRetraits;
-      
-      // Mouvements par mois
-      this.mouvementsParMois = this.groupStockByMonth(stockFiltered);
-    },
-    
-    calculateCommandesStats() {
-      const dateLimit = this.getDateLimit();
-      const commandesFiltered = this.commandes.filter(c => 
-        new Date(c.date_commande) >= dateLimit
-      );
-      
-      // Répartition par statut
-      const statusCount = {
-        'EN_COURS': 0,
-        'LIVREE': 0,
-        'ANNULEE': 0
-      };
-      
-      commandesFiltered.forEach(c => {
-        if (statusCount.hasOwnProperty(c.statut)) {
-          statusCount[c.statut]++;
-        }
+      // Calculer les pourcentages
+      this.orderStatuses.forEach(status => {
+        status.percentage = total > 0 ? (status.count / total) * 100 : 0;
       });
-      
-      const total = commandesFiltered.length || 1;
-      this.orderStatuses = [
-        { 
-          name: 'Livrées', 
-          count: statusCount.LIVREE, 
-          percentage: (statusCount.LIVREE / total * 100).toFixed(0), 
-          color: '#10B981' 
-        },
-        { 
-          name: 'En cours', 
-          count: statusCount.EN_COURS, 
-          percentage: (statusCount.EN_COURS / total * 100).toFixed(0), 
-          color: '#3B82F6' 
-        },
-        { 
-          name: 'Annulées', 
-          count: statusCount.ANNULEE, 
-          percentage: (statusCount.ANNULEE / total * 100).toFixed(0), 
-          color: '#EF4444' 
-        }
+    },
+    
+    loadSuppliersData() {
+      // Données simulées pour les fournisseurs
+      // À remplacer par un appel API réel si disponible
+      this.suppliers = [
+        { name: 'TechSupply Co.', orders: 156, reliability: 98, avgDelay: 2, status: 'active', statusLabel: 'Actif' },
+        { name: 'Global Parts Ltd', orders: 142, reliability: 95, avgDelay: 3, status: 'active', statusLabel: 'Actif' },
+        { name: 'Express Logistics', orders: 128, reliability: 92, avgDelay: 4, status: 'active', statusLabel: 'Actif' },
+        { name: 'Prime Distributors', orders: 98, reliability: 89, avgDelay: 5, status: 'warning', statusLabel: 'Surveillance' },
+        { name: 'Quick Trade Inc', orders: 76, reliability: 94, avgDelay: 3, status: 'active', statusLabel: 'Actif' }
       ];
     },
     
-    prepareFournisseursData() {
-      // Enrichir les données fournisseurs avec le nombre de commandes
-      this.fournisseurs = this.fournisseurs.map(f => {
-        const nombreCommandes = this.commandes.filter(c => 
-          c.fournisseur === f.id_fournisseur
-        ).length;
-        
-        return {
-          ...f,
-          nombre_commandes: nombreCommandes
-        };
-      });
-    },
-    
-    groupByMonth(data, dateField) {
-      const months = {};
-      data.forEach(item => {
-        const date = new Date(item[dateField]);
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        if (!months[key]) {
-          months[key] = { count: 0, revenue: 0 };
-        }
-        months[key].count++;
-        months[key].revenue += parseFloat(item.montant_total || 0);
-      });
-      return months;
-    },
-    
-    groupStockByMonth(data) {
-      const months = {};
-      data.forEach(item => {
-        const date = new Date(item.date_modification);
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        if (!months[key]) {
-          months[key] = { ajouts: 0, retraits: 0 };
-        }
-        if (item.type_modification === 'AJOUT') {
-          months[key].ajouts += item.quantite_modifiee;
-        } else {
-          months[key].retraits += item.quantite_modifiee;
-        }
-      });
-      return months;
-    },
-    
-    getDateLimit() {
-      const days = parseInt(this.dateFilter);
-      const date = new Date();
-      date.setDate(date.getDate() - days);
-      return date;
-    },
-    
-    applyFilters() {
-      // Recharger les données avec les nouveaux filtres
-      this.calculateKPIs();
-      this.calculateVentesStats();
-      this.calculateStockStats();
-      this.calculateCommandesStats();
-      
-      this.$nextTick(() => {
-        this.destroyCharts();
-        this.initCharts();
-      });
-    },
-    
-    initCharts() {
-      this.createOrdersChart();
-      this.createVentesChart();
-      this.createStockChart();
-      this.createSuppliersChart();
+    calculateGrowth(type) {
+      // Simulation de croissance (à calculer avec données période précédente)
+      const growthRates = {
+        orders: 12.5,
+        revenue: 18.2,
+        products: 8.3
+      };
+      return growthRates[type] || 0;
     },
     
     destroyCharts() {
       if (this.ordersChartInstance) this.ordersChartInstance.destroy();
-      if (this.ventesChartInstance) this.ventesChartInstance.destroy();
-      if (this.stockChartInstance) this.stockChartInstance.destroy();
+      if (this.productsChartInstance) this.productsChartInstance.destroy();
       if (this.suppliersChartInstance) this.suppliersChartInstance.destroy();
     },
     
+    initCharts() {
+      this.createOrdersChart();
+      this.createProductsChart();
+      this.createSuppliersChart();
+    },
+    
     createOrdersChart() {
-      if (!this.$refs.ordersChart) return;
+      const ctx = this.$refs.ordersChart?.getContext('2d');
+      if (!ctx) return;
       
-      const ctx = this.$refs.ordersChart.getContext('2d');
-      const months = Object.keys(this.ventesParMois).sort().slice(-6);
+      // Grouper les ventes par mois
+      const salesByMonth = this.groupSalesByMonth();
       
       const data = {
-        labels: months.map(m => {
-          const [year, month] = m.split('-');
-          return new Date(year, month - 1).toLocaleDateString('fr-FR', { month: 'short' });
-        }),
+        labels: salesByMonth.labels,
         datasets: [
           {
             label: 'Commandes',
-            data: months.map(m => this.ventesParMois[m]?.count || 0),
+            data: salesByMonth.orders,
             backgroundColor: '#3B82F6',
             borderColor: '#2563eb',
             borderWidth: 2,
             borderRadius: 6,
+            borderSkipped: false,
           },
           {
             label: 'Revenus (÷1000)',
-            data: months.map(m => (this.ventesParMois[m]?.revenue || 0) / 1000),
+            data: salesByMonth.revenue.map(v => v / 1000),
             backgroundColor: '#10B981',
             borderColor: '#059669',
             borderWidth: 2,
             borderRadius: 6,
+            borderSkipped: false,
           }
         ]
       };
@@ -591,99 +450,84 @@ export default {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: true, position: 'top' }
+            legend: {
+              display: true,
+              position: 'top'
+            }
           },
           scales: {
             y: {
               beginAtZero: true,
-              grid: { color: 'rgba(0, 0, 0, 0.05)' }
+              grid: {
+                color: 'rgba(0, 0, 0, 0.05)'
+              }
             },
-            x: { grid: { display: false } }
-          }
-        }
-      });
-    },
-    
-    createVentesChart() {
-      if (!this.$refs.ventesChart) return;
-      
-      const ctx = this.$refs.ventesChart.getContext('2d');
-      const months = Object.keys(this.ventesParMois).sort().slice(-6);
-      
-      const data = {
-        labels: months.map(m => {
-          const [year, month] = m.split('-');
-          return new Date(year, month - 1).toLocaleDateString('fr-FR', { month: 'short' });
-        }),
-        datasets: [{
-          label: 'Chiffre d\'affaires',
-          data: months.map(m => this.ventesParMois[m]?.revenue || 0),
-          borderColor: '#10B981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          tension: 0.4,
-          fill: true
-        }]
-      };
-      
-      this.ventesChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: data,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: true, position: 'top' }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              grid: { color: 'rgba(0, 0, 0, 0.05)' }
+            x: {
+              grid: {
+                display: false
+              }
             }
           }
         }
       });
     },
     
-    createStockChart() {
-      if (!this.$refs.stockChart) return;
+    groupSalesByMonth() {
+      const monthMap = {};
+      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
       
-      const ctx = this.$refs.stockChart.getContext('2d');
-      const months = Object.keys(this.mouvementsParMois).sort().slice(-6);
+      this.ventesData.forEach(vente => {
+        const date = new Date(vente.date_vente);
+        const monthKey = `${monthNames[date.getMonth()]}`;
+        
+        if (!monthMap[monthKey]) {
+          monthMap[monthKey] = { orders: 0, revenue: 0 };
+        }
+        
+        monthMap[monthKey].orders++;
+        monthMap[monthKey].revenue += parseFloat(vente.montant_total || 0);
+      });
+      
+      const labels = Object.keys(monthMap);
+      const orders = labels.map(label => monthMap[label].orders);
+      const revenue = labels.map(label => monthMap[label].revenue);
+      
+      return { labels, orders, revenue };
+    },
+    
+    createProductsChart() {
+      const ctx = this.$refs.productsChart?.getContext('2d');
+      if (!ctx) return;
+      
+      // Utiliser les données des top produits
+      const labels = this.topProducts.map(p => p.name);
+      const dataValues = this.topProducts.map(p => p.revenue);
       
       const data = {
-        labels: months.map(m => {
-          const [year, month] = m.split('-');
-          return new Date(year, month - 1).toLocaleDateString('fr-FR', { month: 'short' });
-        }),
-        datasets: [
-          {
-            label: 'Ajouts',
-            data: months.map(m => this.mouvementsParMois[m]?.ajouts || 0),
-            backgroundColor: '#10B981',
-            borderRadius: 6,
-          },
-          {
-            label: 'Retraits',
-            data: months.map(m => this.mouvementsParMois[m]?.retraits || 0),
-            backgroundColor: '#EF4444',
-            borderRadius: 6,
-          }
-        ]
+        labels: labels.length > 0 ? labels : ['Aucune donnée'],
+        datasets: [{
+          data: dataValues.length > 0 ? dataValues : [1],
+          backgroundColor: [
+            '#3B82F6',
+            '#10B981',
+            '#F59E0B',
+            '#8B5CF6',
+            '#EC4899'
+          ],
+          borderWidth: 0
+        }]
       };
       
-      this.stockChartInstance = new Chart(ctx, {
-        type: 'bar',
+      this.productsChartInstance = new Chart(ctx, {
+        type: 'doughnut',
         data: data,
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: true, position: 'top' }
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              grid: { color: 'rgba(0, 0, 0, 0.05)' }
+            legend: {
+              display: true,
+              position: 'bottom'
             }
           }
         }
@@ -691,18 +535,14 @@ export default {
     },
     
     createSuppliersChart() {
-      if (!this.$refs.suppliersChart) return;
-      
-      const ctx = this.$refs.suppliersChart.getContext('2d');
-      const topFournisseurs = this.fournisseurs
-        .sort((a, b) => b.nombre_commandes - a.nombre_commandes)
-        .slice(0, 5);
+      const ctx = this.$refs.suppliersChart?.getContext('2d');
+      if (!ctx) return;
       
       const data = {
-        labels: topFournisseurs.map(f => f.nom),
+        labels: this.suppliers.map(s => s.name),
         datasets: [{
-          label: 'Nombre de commandes',
-          data: topFournisseurs.map(f => f.nombre_commandes),
+          label: 'Fiabilité (%)',
+          data: this.suppliers.map(s => s.reliability),
           backgroundColor: '#8B5CF6',
           borderRadius: 6
         }]
@@ -716,14 +556,23 @@ export default {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: false }
+            legend: {
+              display: false
+            }
           },
           scales: {
             x: {
               beginAtZero: true,
-              grid: { color: 'rgba(0, 0, 0, 0.05)' }
+              max: 100,
+              grid: {
+                color: 'rgba(0, 0, 0, 0.05)'
+              }
             },
-            y: { grid: { display: false } }
+            y: {
+              grid: {
+                display: false
+              }
+            }
           }
         }
       });
@@ -737,30 +586,38 @@ export default {
       }).format(value);
     },
     
+    getReliabilityClass(reliability) {
+      if (reliability >= 95) return 'high';
+      if (reliability >= 90) return 'medium';
+      return 'low';
+    },
+    
     exportData() {
-      const data = {
-        periode: `${this.dateFilter} derniers jours`,
-        kpis: {
-          total_commandes: this.totalCommandes,
-          total_revenus: this.totalRevenue,
-          total_produits: this.totalProduits,
-          panier_moyen: this.averageBasket
-        },
-        ventes: this.topProductsVendus,
-        stock: {
-          total_ajouts: this.totalAjouts,
-          total_retraits: this.totalRetraits,
-          bilan_net: this.bilanNet
-        }
-      };
+      // Créer un CSV avec les données
+      const csvData = this.ventesData.map(vente => ({
+        Date: vente.date_vente,
+        Produit: vente.produit_nom,
+        Quantité: vente.quantite_vendue,
+        Montant: vente.montant_total
+      }));
       
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      const csv = this.convertToCSV(csvData);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `statistiques_${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `statistiques-${new Date().toISOString().split('T')[0]}.csv`;
       a.click();
-      URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
+    },
+    
+    convertToCSV(data) {
+      if (data.length === 0) return '';
+      
+      const headers = Object.keys(data[0]).join(',');
+      const rows = data.map(row => Object.values(row).join(','));
+      
+      return [headers, ...rows].join('\n');
     }
   }
 };
@@ -773,28 +630,32 @@ export default {
   min-height: 100vh;
 }
 
-/* Chargement */
-.loading-container {
+/* État de chargement */
+.loading-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 400px;
-  gap: 20px;
+  gap: 16px;
 }
 
 .spinner {
-  width: 50px;
-  height: 50px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3B82F6;
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3B82F6;
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-state p {
+  color: #64748b;
+  font-size: 16px;
 }
 
 /* En-tête */
@@ -859,7 +720,6 @@ export default {
   margin-bottom: 20px;
 }
 
-/* Conteneur des graphiques */
 .charts-container {
   display: flex;
   flex-direction: column;
@@ -877,7 +737,7 @@ export default {
 }
 
 .chart-card {
-  padding: 20px;
+  padding: 10px;
   min-height: 300px;
 }
 
@@ -907,6 +767,7 @@ export default {
   font-size: 14px;
   opacity: 0.9;
   margin-bottom: 8px;
+  text-align: center;
 }
 
 .kpi-value {
@@ -924,16 +785,11 @@ export default {
   color: rgba(255, 255, 255, 0.95);
 }
 
-.kpi-trend.negative {
-  color: rgba(255, 200, 200, 0.95);
-}
-
 .kpi-icon {
   font-size: 48px;
   opacity: 0.3;
 }
 
-/* Titre centré */
 .card-title-centered {
   font-size: 20px;
   font-weight: 700;
@@ -943,9 +799,14 @@ export default {
 }
 
 /* Graphiques */
+.chart-container {
+  height: 220px;
+  margin-bottom: 16px;
+}
+
 .chart-section {
-  height: 250px;
-  margin-bottom: 20px;
+  height: 220px;
+  margin-bottom: 16px;
 }
 
 /* Stats grid */
@@ -953,12 +814,12 @@ export default {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .stat-box {
   background: #f8fafc;
-  padding: 16px;
+  padding: 12px;
   border-radius: 8px;
   text-align: center;
 }
@@ -968,7 +829,6 @@ export default {
   font-size: 12px;
   color: #64748b;
   margin-bottom: 8px;
-  font-weight: 500;
 }
 
 .stat-box .value {
@@ -980,7 +840,7 @@ export default {
 
 /* Section statut */
 .status-section {
-  margin-top: 20px;
+  margin-top: 16px;
 }
 
 .status-section h4 {
@@ -997,7 +857,7 @@ export default {
 .status-info {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-size: 14px;
 }
 
@@ -1011,15 +871,15 @@ export default {
 }
 
 .status-bar {
-  height: 8px;
+  height: 12px;
   background: #f1f5f9;
-  border-radius: 4px;
+  border-radius: 6px;
   overflow: hidden;
 }
 
 .status-progress {
   height: 100%;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: width 0.8s ease;
 }
 
@@ -1029,10 +889,6 @@ export default {
   font-weight: 600;
   color: #1e293b;
   margin-bottom: 16px;
-}
-
-.top-products {
-  margin-top: 20px;
 }
 
 .products-list {
@@ -1067,7 +923,6 @@ export default {
   justify-content: center;
   font-weight: 700;
   font-size: 14px;
-  flex-shrink: 0;
 }
 
 .product-info {
@@ -1091,77 +946,6 @@ export default {
   font-weight: 700;
   color: #10B981;
   font-size: 14px;
-  white-space: nowrap;
-}
-
-/* Statistiques stock */
-.stock-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-top: 20px;
-}
-
-.stat-card {
-  background: #f8fafc;
-  padding: 20px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  transition: all 0.2s;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-}
-
-.stat-ajout {
-  border-left: 4px solid #10B981;
-}
-
-.stat-retrait {
-  border-left: 4px solid #EF4444;
-}
-
-.stat-bilan {
-  border-left: 4px solid #8B5CF6;
-}
-
-.stat-icon {
-  font-size: 36px;
-}
-
-.stat-details {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stat-label {
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 500;
-}
-
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: #1e293b;
-}
-
-.stat-value.positive {
-  color: #10B981;
-}
-
-.stat-value.negative {
-  color: #EF4444;
-}
-
-.stat-subtitle {
-  font-size: 11px;
-  color: #94a3b8;
 }
 
 /* Fournisseurs */
@@ -1172,7 +956,7 @@ export default {
 }
 
 .suppliers-chart {
-  height: 280px;
+  height: 250px;
 }
 
 .suppliers-table {
@@ -1208,6 +992,29 @@ td {
   font-weight: 600;
 }
 
+.reliability-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.reliability-badge.high {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.reliability-badge.medium {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.reliability-badge.low {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
 .status-badge {
   display: inline-block;
   padding: 4px 12px;
@@ -1221,10 +1028,19 @@ td {
   color: #065F46;
 }
 
+.status-badge.warning {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
 /* Responsive */
 @media (max-width: 1200px) {
   .cards-grid-top {
     grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .charts-container {
+    gap: 16px;
   }
   
   .suppliers-container {
@@ -1233,10 +1049,6 @@ td {
   
   .suppliers-chart {
     height: 250px;
-  }
-  
-  .stock-stats {
-    grid-template-columns: repeat(2, 1fr);
   }
 }
 
@@ -1264,25 +1076,17 @@ td {
     gap: 16px;
   }
   
+  .charts-container {
+    gap: 16px;
+  }
+  
   .stats-grid {
     grid-template-columns: 1fr;
     gap: 12px;
   }
   
-  .stock-stats {
-    grid-template-columns: 1fr;
-  }
-  
   .dashboard-card {
     padding: 16px;
-  }
-  
-  .chart-section {
-    height: 200px;
-  }
-  
-  .suppliers-chart {
-    height: 200px;
   }
   
   .kpi-value {
@@ -1293,6 +1097,19 @@ td {
     font-size: 36px;
   }
   
+  .chart-container {
+    height: 180px;
+  }
+  
+  .suppliers-chart {
+    height: 200px;
+  }
+  
+  .suppliers-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
   table {
     min-width: 500px;
   }
@@ -1301,6 +1118,16 @@ td {
     padding: 8px;
     font-size: 12px;
   }
+  
+  .product-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .product-rank {
+    align-self: flex-start;
+  }
 }
 
 @media (max-width: 480px) {
@@ -1308,23 +1135,32 @@ td {
     padding: 12px;
   }
   
-  .chart-section {
-    height: 180px;
+  .dashboard-card {
+    padding: 12px;
   }
   
   .kpi-value {
     font-size: 24px;
   }
   
-  .stat-card {
-    padding: 16px;
+  .kpi-icon {
+    font-size: 32px;
   }
   
-  .stat-icon {
-    font-size: 28px;
+  .chart-container {
+    height: 150px;
   }
   
-  .stat-value {
-    font-size: 20px;
+  .suppliers-chart {
+    height: 180px;
+  }
+  
+  .stat-box {
+    padding: 12px;
+  }
+  
+  .stat-box .value {
+    font-size: 16px;
   }
 }
+</style>
