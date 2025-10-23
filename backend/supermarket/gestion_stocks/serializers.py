@@ -47,7 +47,7 @@ class ProduitSerializer(serializers.ModelSerializer):
     est_perime = serializers.SerializerMethodField()
     atteint_seuil = serializers.SerializerMethodField()
 
-    class Meta:
+    class Meta: 
         model = Produit
         fields = [
             'id_product', 'nom', 'reference', 'designation', 'prix_unitaire',

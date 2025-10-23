@@ -4,7 +4,7 @@ from django.shortcuts import render
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response 
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -34,7 +34,7 @@ class CategorieViewSet(viewsets.ModelViewSet):
     """
     queryset = Categorie.objects.all()
     serializer_class = CategorieSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Modifié pour le développement
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['nom', 'description']
     ordering_fields = ['nom']
@@ -153,7 +153,7 @@ class ProduitViewSet(viewsets.ModelViewSet):
     ordering = ['nom']
 
     @action(detail=False, methods=['get'])
-    def sous_seuil(self, request):
+    def sous_seuil(self, request): 
         """
         Action pour récupérer tous les produits sous le seuil de réapprovisionnement.
         GET /api/produits/sous-seuil/list/
