@@ -1,35 +1,34 @@
 <template>
   <div class="orders-page">
     <!-- Cartes de statistiques -->
-    <div class="stats-container">
+        <!-- Stats Cards -->
+    <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-content">
-          <h3>Total commande Mois <br>Octobre 2024</h3>
-          <div class="stat-icon">
-            <img src="@/assets/icons/form.svg" alt="Total Commandes" />
-          </div>
+        <div class="stat-icon" style="background: #e3f2fd">
+          <i class="fas fa-shopping-cart" style="color: #1976d2"></i>
         </div>
-        <div class="stat-bar"></div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.totalMois }}</div>
+          <div class="stat-label">Commandes ce mois</div>
+        </div>
       </div>
-      
       <div class="stat-card">
-        <div class="stat-content">
-          <h3>Commande en cours</h3>
-          <div class="stat-icon">
-            <img src="@/assets/icons/box.png" alt="Total Commandes" />
-          </div>
+        <div class="stat-icon" style="background: #fff3cd">
+          <i class="fas fa-clock" style="color: #ff9800"></i>
         </div>
-        <div class="stat-bar"></div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.enCours }}</div>
+          <div class="stat-label">Commandes en cours</div>
+        </div>
       </div>
-      
       <div class="stat-card">
-        <div class="stat-content">
-          <h3>Total Fournisseurs</h3>
-          <div class="stat-icon">
-            <img src="@/assets/icons/livraison.png" alt="Total Commandes" />
-          </div>
+        <div class="stat-icon" style="background: #d4edda">
+          <i class="fas fa-truck" style="color: #4caf50"></i>
         </div>
-        <div class="stat-bar"></div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.totalFournisseurs }}</div>
+          <div class="stat-label">Fournisseurs actifs</div>
+        </div>
       </div>
     </div>
 
@@ -43,11 +42,10 @@
             </div>
             <div class="status-bg">
                 <select v-model="selectedStatus" class="status-filter">
-                    <option value="">Statut</option>
-                    <option value="pending">En attente</option>
-                    <option value="processing">En cours</option>
-                    <option value="shipped">Expédié</option>
-                    <option value="delivered">Livré</option>
+                    <option value="">Tous les statuts</option>
+                    <option value="EN_COURS">En cours</option>
+                    <option value="LIVREE">Livrée</option>
+                    <option value="ANNULEE">Annulée</option>
                 </select>
             </div>
         </div>
@@ -76,20 +74,53 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="order in filteredOrders" :key="order.id">
-            <td>{{ order.product }}</td>
-            <td>{{ order.quantity }}</td>
-            <td>{{ order.supplier }}</td>
-            <td>{{ order.arrivalDate }}</td>
+          <tr v-if="loading">
+            <td colspan="6" style="text-align: center; padding: 40px;">
+              Chargement des commandes...
+            </td>
+          </tr>
+          <tr v-else-if="filteredCommandes.length === 0">
+            <td colspan="6" style="text-align: center; padding: 40px;">
+              Aucune commande trouvée
+            </td>
+          </tr>
+          <tr v-else v-for="commande in filteredCommandes" :key="commande.id_commande">
+            <td>{{ getCommandeProducts(commande.id_commande) }}</td>
+            <td>{{ getCommandeQuantite(commande.id_commande) }}</td>
+            <td>{{ getFournisseurName(commande.fournisseur) }}</td>
+            <td>{{ formatDate(commande.date_livraison_prevue) }}</td>
             <td>
-              <span :class="['status-badge', order.status]">
-                {{ getStatusLabel(order.status) }}
+              <span :class="['status-badge', mapDjangoStatusToFrontend(commande.statut)]">
+                {{ getStatusLabel(commande.statut) }}
               </span>
             </td>
             <td class="actions-cell">
-              <button class="action-icon" title="Modifier">✏️</button>
-              <button class="action-icon" title="Voir">👁️</button>
-              <button class="action-icon delete" title="Supprimer">🗑️</button>
+              <button 
+                v-if="commande.statut === 'EN_COURS'" 
+                class="action-icon" 
+                title="Valider"
+                @click="validerCommande(commande)">
+                ✅
+              </button>
+              <button 
+                v-if="commande.statut === 'EN_COURS'" 
+                class="action-icon delete" 
+                title="Annuler"
+                @click="annulerCommande(commande)">
+                ❌
+              </button>
+              <button 
+                class="action-icon" 
+                title="Détails"
+                @click="voirDetailsCommande(commande)">
+                👁️
+              </button>
+              <button 
+                class="action-icon delete" 
+                title="Supprimer"
+                @click="deleteCommande(commande)">
+                🗑️
+              </button>
             </td>
           </tr>
         </tbody>
@@ -106,38 +137,92 @@
       </div>
       <form class="modal-body" @submit.prevent="submitOrder">
         <div class="form-row">
-          <label for="product">Produit</label>
-          <input id="product" v-model="form.product" type="text" placeholder="Ex: Coca-Cola" required>
-        </div>
-
-        <div class="form-row">
-          <label for="quantity">Quantité</label>
-          <input id="quantity" v-model="form.quantity" type="text" placeholder="Ex: 500 Packs" required>
-        </div>
-
-        <div class="form-row">
           <label for="supplier">Fournisseur</label>
-          <input id="supplier" v-model="form.supplier" type="text" placeholder="Ex: Solibra" required>
+          <select id="supplier" v-model="form.fournisseur" required>
+            <option value="">-- Sélectionner un fournisseur --</option>
+            <option 
+              v-for="fournisseur in fournisseurs" 
+              :key="fournisseur.id_fournisseur" 
+              :value="fournisseur.id_fournisseur">
+              {{ fournisseur.nom }}
+            </option>
+          </select>
         </div>
 
         <div class="form-row">
-          <label for="arrivalDate">Date d'arrivage</label>
-          <input id="arrivalDate" v-model="form.arrivalDate" type="date" required>
+          <label for="arrivalDate">Date de livraison prévue</label>
+          <input id="arrivalDate" v-model="form.date_livraison_prevue" type="date" required>
         </div>
 
         <div class="form-row">
           <label for="status">Statut</label>
-          <select id="status" v-model="form.status" required>
-            <option value="pending">En attente</option>
-            <option value="processing">En cours</option>
-            <option value="shipped">Expédié</option>
-            <option value="delivered">Livré</option>
+          <select id="status" v-model="form.statut" required>
+            <option value="EN_COURS">En cours</option>
+            <option value="LIVREE">Livrée</option>
+            <option value="ANNULEE">Annulée</option>
           </select>
+        </div>
+
+        <!-- Section Produits -->
+        <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px;">
+          <h4 style="margin-bottom: 15px;">Produits de la commande</h4>
+          
+          <div 
+            v-for="(produitItem, index) in form.produits" 
+            :key="index"
+            style="display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-end;">
+            
+            <div class="form-row" style="flex: 2; margin: 0;">
+              <label :for="'produit-' + index">Produit</label>
+              <select 
+                :id="'produit-' + index" 
+                v-model="produitItem.produit" 
+                required>
+                <option value="">-- Sélectionner un produit --</option>
+                <option 
+                  v-for="produit in produits" 
+                  :key="produit.id_product" 
+                  :value="produit.id_product">
+                  {{ produit.nom }}
+                </option>
+              </select>
+            </div>
+
+            <div class="form-row" style="flex: 1; margin: 0;">
+              <label :for="'quantite-' + index">Quantité</label>
+              <input 
+                :id="'quantite-' + index" 
+                v-model="produitItem.quantite" 
+                type="number" 
+                min="1"
+                placeholder="Ex: 100" 
+                required>
+            </div>
+
+            <button 
+              v-if="form.produits.length > 1"
+              type="button"
+              @click="supprimerProduit(index)"
+              class="btn-secondary"
+              style="height: 40px; padding: 0 15px;">
+              ✕
+            </button>
+          </div>
+
+          <button 
+            type="button"
+            @click="ajouterProduit"
+            class="btn-secondary"
+            style="margin-top: 10px;">
+            + Ajouter un produit
+          </button>
         </div>
 
         <div class="modal-actions">
           <button type="button" class="btn-secondary" @click="closeModal">Annuler</button>
-          <button type="submit" class="btn-primary">Ajouter</button>
+          <button type="submit" class="btn-primary" :disabled="loading">
+            {{ loading ? 'Création...' : 'Créer la commande' }}
+          </button>
         </div>
       </form>
     </div>
@@ -145,6 +230,8 @@
 </template>
 
 <script>
+import { commandesAPI, produitsAPI, fournisseursAPI, detailsCommandesAPI } from '@/services';
+
 export default {
   name: 'OrdersManagementPage',
   data() {
@@ -152,187 +239,367 @@ export default {
       searchQuery: '',
       selectedStatus: '',
       showModal: false,
-      nextOrderId: 5,
-      form: {
-        product: '',
-        quantity: '',
-        supplier: '',
-        arrivalDate: '',
-        status: 'pending'
+      loading: false,
+      error: null,
+      
+      // Données du backend
+      commandes: [],
+      produits: [],
+      fournisseurs: [],
+      details: [],
+      
+      // Statistiques
+      stats: {
+        totalMois: 0,
+        enCours: 0,
+        totalFournisseurs: 0
       },
-      orders: [
-        {
-          id: 1,
-          product: 'Coca-Cola II',
-          quantity: '500 Packs',
-          supplier: 'Solibra',
-          arrivalDate: '20/12/2025',
-          status: 'processing'
-        },
-        {
-          id: 2,
-          product: 'Fanta Orange',
-          quantity: '300 Packs',
-          supplier: 'Solibra',
-          arrivalDate: '22/12/2025',
-          status: 'pending'
-        },
-        {
-          id: 3,
-          product: 'Sprite Lemon',
-          quantity: '250 Packs',
-          supplier: 'Maison Africaine',
-          arrivalDate: '18/12/2025',
-          status: 'shipped'
-        },
-        {
-          id: 4,
-          product: 'Jus Tropical',
-          quantity: '150 Packs',
-          supplier: 'Solibra',
-          arrivalDate: '15/12/2025',
-          status: 'delivered'
-        }
-      ]
+      
+      form: {
+        fournisseur: '',
+        date_livraison_prevue: '',
+        statut: 'EN_COURS',
+        produits: [
+          {
+            produit: '',
+            quantite: ''
+          }
+        ]
+      }
     };
   },
+  mounted() {
+    this.loadData();
+  },
   computed: {
-    filteredOrders() {
-      return this.orders.filter(order => {
+    filteredCommandes() {
+      return this.commandes.filter(commande => {
         const matchesSearch =
-          order.product.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-          order.supplier.toLowerCase().includes(this.searchQuery.toLowerCase());
-        const matchesStatus = !this.selectedStatus || order.status === this.selectedStatus;
+          this.getCommandeProducts(commande.id_commande).toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+          this.getFournisseurName(commande.fournisseur).toLowerCase().includes(this.searchQuery.toLowerCase());
+        const matchesStatus = !this.selectedStatus || commande.statut === this.selectedStatus;
         return matchesSearch && matchesStatus;
       });
     }
   },
   methods: {
+    /**
+     * Charge toutes les données depuis l'API
+     */
+    async loadData() {
+      this.loading = true;
+      this.error = null;
+      
+      try {
+        // Charger toutes les données en parallèle
+        const [commandesRes, produitsRes, fournisseursRes, detailsRes] = await Promise.all([
+          commandesAPI.getAllCommandes(),
+          produitsAPI.getAllProduits(),
+          fournisseursAPI.getAllFournisseurs(),
+          detailsCommandesAPI.getAllDetailsCommandes()
+        ]);
+        
+        this.commandes = commandesRes.data;
+        this.produits = produitsRes.data;
+        this.fournisseurs = fournisseursRes.data;
+        this.details = detailsRes.data;
+        
+        // Calculer les statistiques
+        this.calculateStats();
+        
+        console.log('Données chargées:', {
+          commandes: this.commandes.length,
+          produits: this.produits.length,
+          fournisseurs: this.fournisseurs.length,
+          details: this.details.length
+        });
+        
+      } catch (err) {
+        this.error = 'Erreur lors du chargement des données';
+        console.error('Erreur:', err);
+        alert('Erreur lors du chargement des commandes');
+      } finally {
+        this.loading = false;
+      }
+    },
+    
+    /**
+     * Calcule les statistiques pour les cartes
+     */
+    calculateStats() {
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      // Total des commandes du mois en cours
+      this.stats.totalMois = this.commandes.filter(cmd => {
+        const cmdDate = new Date(cmd.date_commande);
+        return cmdDate.getMonth() === currentMonth && cmdDate.getFullYear() === currentYear;
+      }).length;
+      
+      // Commandes en cours
+      this.stats.enCours = this.commandes.filter(cmd => cmd.statut === 'EN_COURS').length;
+      
+      // Total fournisseurs
+      this.stats.totalFournisseurs = this.fournisseurs.length;
+    },
+    
+    /**
+     * Récupère les produits d'une commande
+     */
+    getCommandeProducts(commandeId) {
+      const commandeDetails = this.details.filter(d => d.commande === commandeId);
+      return commandeDetails.map(d => {
+        const produit = this.produits.find(p => p.id_product === d.produit);
+        return produit ? `${produit.nom} (${d.quantite})` : 'Produit inconnu';
+      }).join(', ') || 'Aucun produit';
+    },
+    
+    /**
+     * Récupère la quantité totale d'une commande
+     */
+    getCommandeQuantite(commandeId) {
+      const commandeDetails = this.details.filter(d => d.commande === commandeId);
+      const total = commandeDetails.reduce((sum, d) => sum + d.quantite, 0);
+      return `${total} unités`;
+    },
+    
+    /**
+     * Récupère le nom du fournisseur
+     */
+    getFournisseurName(fournisseurId) {
+      const fournisseur = this.fournisseurs.find(f => f.id_fournisseur === fournisseurId);
+      return fournisseur ? fournisseur.nom : 'Fournisseur inconnu';
+    },
+    
+    /**
+     * Formate une date
+     */
+    formatDate(dateString) {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    },
+    
+    /**
+     * Mapper les statuts Django vers les statuts frontend
+     */
+    mapDjangoStatusToFrontend(djangoStatus) {
+      const mapping = {
+        'EN_COURS': 'processing',
+        'LIVREE': 'delivered',
+        'ANNULEE': 'cancelled'
+      };
+      return mapping[djangoStatus] || 'pending';
+    },
+    
+    /**
+     * Mapper les statuts frontend vers Django
+     */
+    mapFrontendStatusToDjango(frontendStatus) {
+      const mapping = {
+        'processing': 'EN_COURS',
+        'delivered': 'LIVREE',
+        'cancelled': 'ANNULEE',
+        'pending': 'EN_COURS'
+      };
+      return mapping[frontendStatus] || 'EN_COURS';
+    },
+    
     getStatusLabel(status) {
       const labels = {
-        pending: 'En attente',
-        processing: 'En cours',
-        shipped: 'Expédié',
-        delivered: 'Livré'
+        'EN_COURS': 'En Cours',
+        'LIVREE': 'Livrée',
+        'ANNULEE': 'Annulée',
+        'processing': 'En Cours',
+        'delivered': 'Livrée',
+        'cancelled': 'Annulée',
+        'pending': 'En Attente'
       };
       return labels[status] || status;
     },
-    getStatusStyle(status) {
-      // Les styles corrects selon le design général de status-badge dans le CSS du composant
-      switch (status) {
-        case 'pending':
-          return {
-            background: '#fff3cd',
-            color: '#856404',
-            fontWeight: 600,
-            borderRadius: '20px',
-            padding: '6px 12px',
-            textTransform: 'capitalize',
-            fontSize: '12px',
-            minWidth: '110px',
-            textAlign: 'center',
-            display: 'inline-block',
-            boxSizing: 'border-box'
-          };
-        case 'processing':
-          return {
-            background: '#cce5ff',
-            color: '#003d99',
-            fontWeight: 600,
-            borderRadius: '20px',
-            padding: '6px 12px',
-            textTransform: 'capitalize',
-            fontSize: '12px',
-            minWidth: '110px',
-            textAlign: 'center',
-            display: 'inline-block',
-            boxSizing: 'border-box'
-          };
-        case 'shipped':
-          return {
-            background: '#d4edda',
-            color: '#155724',
-            fontWeight: 600,
-            borderRadius: '20px',
-            padding: '6px 12px',
-            textTransform: 'capitalize',
-            fontSize: '12px',
-            minWidth: '110px',
-            textAlign: 'center',
-            display: 'inline-block',
-            boxSizing: 'border-box'
-          };
-        case 'delivered':
-          return {
-            background: '#e2d9f3',
-            color: '#6f42c1',
-            fontWeight: 600,
-            borderRadius: '20px',
-            padding: '6px 12px',
-            textTransform: 'capitalize',
-            fontSize: '12px',
-            minWidth: '110px',
-            textAlign: 'center',
-            display: 'inline-block',
-            boxSizing: 'border-box'
-          };
-        default:
-          return {
-            background: '#f5f5f5',
-            color: '#333',
-            fontWeight: 600,
-            borderRadius: '20px',
-            padding: '6px 12px',
-            textTransform: 'capitalize',
-            fontSize: '12px',
-            minWidth: '110px',
-            textAlign: 'center',
-            display: 'inline-block',
-            boxSizing: 'border-box'
-          };
-      }
-    },
+    
+    /**
+     * Ouvre le modal pour créer une nouvelle commande
+     */
     openModal() {
       this.resetForm();
       this.showModal = true;
     },
+    
+    /**
+     * Ferme le modal
+     */
     closeModal() {
       this.showModal = false;
     },
-    submitOrder() {
-      const newOrder = {
-        id: this.nextOrderId++,
-        product: this.form.product.trim(),
-        quantity: this.form.quantity.trim(),
-        supplier: this.form.supplier.trim(),
-        arrivalDate: this.formatDateDisplay(this.form.arrivalDate),
-        status: this.form.status
-      };
-
-      if (!newOrder.product || !newOrder.quantity || !newOrder.supplier || !this.form.arrivalDate) {
+    
+    /**
+     * Soumet une nouvelle commande
+     */
+    async submitOrder() {
+      if (!this.form.fournisseur || !this.form.date_livraison_prevue) {
+        alert('Veuillez remplir tous les champs obligatoires');
         return;
       }
-
-      this.orders.unshift(newOrder);
-      this.closeModal();
+      
+      // Vérifier qu'il y a au moins un produit
+      const produitsValides = this.form.produits.filter(p => p.produit && p.quantite > 0);
+      if (produitsValides.length === 0) {
+        alert('Veuillez ajouter au moins un produit à la commande');
+        return;
+      }
+      
+      this.loading = true;
+      
+      try {
+        // 1. Créer la commande d'approvisionnement
+        const commandeData = {
+          fournisseur: this.form.fournisseur,
+          date_livraison_prevue: new Date(this.form.date_livraison_prevue).toISOString(),
+          statut: this.form.statut
+        };
+        
+        const commandeRes = await commandesAPI.createCommande(commandeData);
+        const nouvelleCommande = commandeRes.data;
+        
+        console.log('Commande créée:', nouvelleCommande);
+        
+        // 2. Créer les détails de commande pour chaque produit
+        for (const produitItem of produitsValides) {
+          const detailData = {
+            commande: nouvelleCommande.id_commande,
+            produit: produitItem.produit,
+            quantite: parseInt(produitItem.quantite)
+          };
+          
+          await detailsCommandesAPI.createDetailCommande(detailData);
+        }
+        
+        console.log('Détails de commande créés');
+        
+        // 3. Recharger les données
+        await this.loadData();
+        
+        // 4. Fermer le modal
+        this.closeModal();
+        
+        alert('Commande créée avec succès !');
+        
+      } catch (err) {
+        console.error('Erreur lors de la création de la commande:', err);
+        alert(err.response?.data?.message || 'Erreur lors de la création de la commande');
+      } finally {
+        this.loading = false;
+      }
     },
+    
+    /**
+     * Ajoute une ligne de produit au formulaire
+     */
+    ajouterProduit() {
+      this.form.produits.push({
+        produit: '',
+        quantite: ''
+      });
+    },
+    
+    /**
+     * Supprime une ligne de produit du formulaire
+     */
+    supprimerProduit(index) {
+      if (this.form.produits.length > 1) {
+        this.form.produits.splice(index, 1);
+      }
+    },
+    
+    /**
+     * Réinitialise le formulaire
+     */
     resetForm() {
       this.form = {
-        product: '',
-        quantity: '',
-        supplier: '',
-        arrivalDate: '',
-        status: 'pending'
+        fournisseur: '',
+        date_livraison_prevue: '',
+        statut: 'EN_COURS',
+        produits: [
+          {
+            produit: '',
+            quantite: ''
+          }
+        ]
       };
     },
-    formatDateDisplay(isoDate) {
-      // Convertit yyyy-mm-dd en dd/mm/yyyy
-      if (!isoDate) return '';
-      const [y, m, d] = isoDate.split('-');
-      return `${d}/${m}/${y}`;
+    
+    /**
+     * Valide une commande
+     */
+    async validerCommande(commande) {
+      if (!confirm(`Valider la commande pour ${this.getFournisseurName(commande.fournisseur)} ?`)) {
+        return;
+      }
+      
+      try {
+        await commandesAPI.validerCommande(commande.id_commande);
+        await this.loadData();
+        alert('Commande validée avec succès !');
+      } catch (err) {
+        console.error('Erreur:', err);
+        alert('Erreur lors de la validation de la commande');
+      }
+    },
+    
+    /**
+     * Annule une commande
+     */
+    async annulerCommande(commande) {
+      if (!confirm(`Annuler la commande pour ${this.getFournisseurName(commande.fournisseur)} ?`)) {
+        return;
+      }
+      
+      try {
+        await commandesAPI.annulerCommande(commande.id_commande);
+        await this.loadData();
+        alert('Commande annulée avec succès !');
+      } catch (err) {
+        console.error('Erreur:', err);
+        alert('Erreur lors de l\'annulation de la commande');
+      }
+    },
+    
+    /**
+     * Supprime une commande
+     */
+    async deleteCommande(commande) {
+      if (!confirm(`Supprimer définitivement la commande pour ${this.getFournisseurName(commande.fournisseur)} ?`)) {
+        return;
+      }
+      
+      try {
+        await commandesAPI.deleteCommande(commande.id_commande);
+        await this.loadData();
+        alert('Commande supprimée avec succès !');
+      } catch (err) {
+        console.error('Erreur:', err);
+        alert('Erreur lors de la suppression de la commande');
+      }
+    },
+    
+    /**
+     * Affiche les détails d'une commande
+     */
+    voirDetailsCommande(commande) {
+      const details = this.details.filter(d => d.commande === commande.id_commande);
+      const produitsInfo = details.map(d => {
+        const produit = this.produits.find(p => p.id_product === d.produit);
+        return `- ${produit?.nom || 'Inconnu'}: ${d.quantite} unités`;
+      }).join('\n');
+      
+      alert(`Détails de la commande:\n\nFournisseur: ${this.getFournisseurName(commande.fournisseur)}\nDate: ${this.formatDate(commande.date_commande)}\nLivraison prévue: ${this.formatDate(commande.date_livraison_prevue)}\nStatut: ${this.getStatusLabel(commande.statut)}\n\nProduits:\n${produitsInfo}`);
     }
-    }
-  
+  }
 };
 </script>
 

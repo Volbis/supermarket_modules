@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'Users',
     'corsheaders',
     'rest_framework',
+    'django_filters',  # Ajouté pour les filtres DRF
 ]
 
 MIDDLEWARE = [

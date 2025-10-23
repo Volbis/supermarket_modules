@@ -27,7 +27,7 @@ class FournisseurSerializer(serializers.ModelSerializer):
         model = Fournisseur
         fields = [
             'id_fournisseur', 'nom', 'contact', 'adresse',
-            'catalogue_produits', 'delais_livraison_jours', 'nombre_produits'
+            'delais_livraison_jours', 'nombre_produits'
         ]
         read_only_fields = ['id_fournisseur', 'nombre_produits']
 
@@ -37,7 +37,7 @@ class FournisseurSerializer(serializers.ModelSerializer):
 
 
 class ProduitSerializer(serializers.ModelSerializer):
-    """
+    """ 
     Sérializeur pour le modèle Produit.
     Gère la sérialisation complète des produits avec détails des relations.
     """
