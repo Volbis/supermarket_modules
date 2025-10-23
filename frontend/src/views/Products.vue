@@ -61,9 +61,9 @@
         <div class="filter-item">
           <select v-model="selectedCategory" class="filter-select">
             <option value="">📂 Toutes les catégories</option>
-            <option value="fruits">🍎 Fruits</option>
-            <option value="légumes">🥕 Légumes</option>
-            <option value="produits laitiers">🥛 Produits laitiers</option>
+            <option v-for="category in uniqueCategories" :key="category" :value="category">
+              {{ category }}
+            </option>
           </select>
         </div>
         
@@ -94,42 +94,64 @@
       </div>
     </div>
     
+    <!-- Message de chargement -->
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Chargement des produits...</p>
+    </div>
+
+    <!-- Message d'erreur -->
+    <div v-if="error" class="error-state">
+      <div class="error-icon">⚠️</div>
+      <h3>Erreur</h3>
+      <p>{{ error }}</p>
+      <button class="add-product-btn" @click="loadProducts">
+        🔄 Réessayer
+      </button>
+    </div>
+
     <!-- Grille de produits -->
-    <div :class="['products-grid', viewMode]">
-      <div v-for="product in sortedProducts" :key="product.id" class="product-card">
-        <div class="product-badge" v-if="product.stock <= 10">
+    <div v-if="!loading && !error" :class="['products-grid', viewMode]">
+      <div v-for="product in sortedProducts" :key="product.id_product" class="product-card">
+        <div class="product-badge" v-if="product.est_sous_seuil || product.atteint_seuil">
           <span class="badge-text">Stock faible</span>
+        </div>
+        <div class="product-badge" v-else-if="product.est_perime" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+          <span class="badge-text">Périmé</span>
         </div>
         
         <div class="product-image">
-          <img :src="product.image" :alt="product.name" />
+          <img :src="getProductImage(product)" :alt="product.nom" />
           <div class="product-overlay">
-            <button class="quick-action" title="Voir détails">👁️</button>
-            <button class="quick-action" title="Modifier">✏️</button>
+            <button class="quick-action" title="Voir détails" @click="viewProduct(product)">👁️</button>
+            <button class="quick-action" title="Modifier" @click="editProduct(product)">✏️</button>
           </div>
         </div>
         
         <div class="product-info">
           <div class="product-header">
-            <h3 class="product-name">{{ product.name }}</h3>
-            <span class="product-category-badge">{{ product.category }}</span>
+            <h3 class="product-name">{{ product.nom }}</h3>
+            <span class="product-category-badge">{{ product.categorie_nom }}</span>
           </div>
           
           <div class="product-details">
             <div class="price-section">
-              <span class="product-price">{{ product.price }}</span>
-              <span class="price-unit">par {{ product.unit }}</span>
+              <span class="product-price">{{ product.prix_unitaire }} CFA</span>
+              <span class="price-unit">Réf: {{ product.reference }}</span>
             </div>
             
             <div class="stock-section">
               <div class="stock-progress">
                 <div 
                   class="stock-bar" 
-                  :style="{ width: getStockPercentage(product.stock) + '%' }"
-                  :class="{ 'low': product.stock <= 10, 'medium': product.stock > 10 && product.stock <= 30 }"
+                  :style="{ width: getStockPercentage(product.quantite_en_stock) + '%' }"
+                  :class="{ 
+                    'low': product.est_sous_seuil, 
+                    'medium': product.atteint_seuil && !product.est_sous_seuil 
+                  }"
                 ></div>
               </div>
-              <span class="stock-text">{{ product.stock }} unités</span>
+              <span class="stock-text">{{ product.quantite_en_stock }} unités (seuil: {{ product.seuil_de_reapprovisionnement }})</span>
             </div>
           </div>
         </div>
@@ -149,7 +171,7 @@
     </div>
 
     <!-- Message si aucun produit -->
-    <div v-if="sortedProducts.length === 0" class="empty-state">
+    <div v-if="!loading && !error && sortedProducts.length === 0" class="empty-state">
       <div class="empty-icon">📦</div>
       <h3>Aucun produit trouvé</h3>
       <p>Essayez de modifier vos filtres ou ajoutez un nouveau produit</p>
@@ -158,10 +180,246 @@
         Ajouter un produit
       </button>
     </div>
+
+    <!-- Modal Ajout/Édition de produit -->
+    <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>{{ isEditMode ? 'Modifier le produit' : 'Ajouter un produit' }}</h3>
+          <button class="close-btn" @click="closeModal">✕</button>
+        </div>
+        
+        <form @submit.prevent="submitProduct" class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="nom">Nom du produit *</label>
+              <input 
+                type="text" 
+                id="nom" 
+                v-model="formData.nom" 
+                required 
+                placeholder="Ex: Savon antiseptique"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="reference">Référence *</label>
+              <input 
+                type="text" 
+                id="reference" 
+                v-model="formData.reference" 
+                required 
+                placeholder="Ex: PRD-001"
+              />
+            </div>
+
+            <div class="form-group full-width">
+              <label for="designation">Description *</label>
+              <textarea 
+                id="designation" 
+                v-model="formData.designation" 
+                required 
+                rows="3"
+                placeholder="Description du produit"
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="prix_unitaire">Prix unitaire (CFA) *</label>
+              <input 
+                type="number" 
+                id="prix_unitaire" 
+                v-model="formData.prix_unitaire" 
+                required 
+                step="0.01"
+                min="0"
+                placeholder="0.00"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="quantite_en_stock">Quantité en stock *</label>
+              <input 
+                type="number" 
+                id="quantite_en_stock" 
+                v-model="formData.quantite_en_stock" 
+                required 
+                min="0"
+                placeholder="0"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="seuil_de_reapprovisionnement">Seuil de réappro. *</label>
+              <input 
+                type="number" 
+                id="seuil_de_reapprovisionnement" 
+                v-model="formData.seuil_de_reapprovisionnement" 
+                required 
+                min="0"
+                placeholder="0"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="date_de_peremption">Date de péremption *</label>
+              <input 
+                type="date" 
+                id="date_de_peremption" 
+                v-model="formData.date_de_peremption" 
+                required 
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="categorie">Catégorie *</label>
+              <select 
+                id="categorie" 
+                v-model="formData.categorie" 
+                required
+              >
+                <option value="">-- Sélectionner une catégorie --</option>
+                <option 
+                  v-for="cat in categoriesList" 
+                  :key="cat.id_categorie" 
+                  :value="cat.id_categorie"
+                >
+                  {{ cat.nom }}
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="fournisseur">Fournisseur *</label>
+              <select 
+                id="fournisseur" 
+                v-model="formData.fournisseur" 
+                required
+              >
+                <option value="">-- Sélectionner un fournisseur --</option>
+                <option 
+                  v-for="fourni in fournisseursList" 
+                  :key="fourni.id_fournisseur" 
+                  :value="fourni.id_fournisseur"
+                >
+                  {{ fourni.nom }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-cancel" @click="closeModal">
+              Annuler
+            </button>
+            <button type="submit" class="btn-submit" :disabled="submitting">
+              {{ submitting ? 'Enregistrement...' : (isEditMode ? 'Mettre à jour' : 'Ajouter') }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Détails du produit -->
+    <div v-if="showDetailsModal" class="modal-overlay" @click.self="closeDetailsModal">
+      <div class="modal-content details-modal">
+        <div class="modal-header">
+          <h3>Détails du produit</h3>
+          <button class="close-btn" @click="closeDetailsModal">✕</button>
+        </div>
+        
+        <div class="modal-body details-body" v-if="selectedProduct">
+          <div class="details-image">
+            <img :src="getProductImage(selectedProduct)" :alt="selectedProduct.nom" />
+          </div>
+
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">Nom</span>
+              <span class="detail-value">{{ selectedProduct.nom }}</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Référence</span>
+              <span class="detail-value">{{ selectedProduct.reference }}</span>
+            </div>
+
+            <div class="detail-item full-width">
+              <span class="detail-label">Description</span>
+              <span class="detail-value">{{ selectedProduct.designation }}</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Prix unitaire</span>
+              <span class="detail-value price">{{ selectedProduct.prix_unitaire }} CFA</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Quantité en stock</span>
+              <span class="detail-value" :class="{ 'text-danger': selectedProduct.est_sous_seuil }">
+                {{ selectedProduct.quantite_en_stock }} unités
+              </span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Seuil de réappro.</span>
+              <span class="detail-value">{{ selectedProduct.seuil_de_reapprovisionnement }} unités</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Date de péremption</span>
+              <span class="detail-value" :class="{ 'text-danger': selectedProduct.est_perime }">
+                {{ formatDate(selectedProduct.date_de_peremption) }}
+              </span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Catégorie</span>
+              <span class="detail-value badge-cat">{{ selectedProduct.categorie_nom }}</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Fournisseur</span>
+              <span class="detail-value">{{ selectedProduct.fournisseur_nom }}</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Statut</span>
+              <span class="detail-value">
+                <span v-if="selectedProduct.est_perime" class="status-badge danger">Périmé</span>
+                <span v-else-if="selectedProduct.est_sous_seuil" class="status-badge warning">Stock faible</span>
+                <span v-else-if="selectedProduct.atteint_seuil" class="status-badge warning">Seuil atteint</span>
+                <span v-else class="status-badge success">Disponible</span>
+              </span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Valeur totale</span>
+              <span class="detail-value price">
+                {{ (parseFloat(selectedProduct.prix_unitaire) * selectedProduct.quantite_en_stock).toFixed(2) }} CFA
+              </span>
+            </div>
+          </div>
+
+          <div class="details-actions">
+            <button class="btn-edit" @click="editFromDetails">
+              <span>✏️</span> Modifier
+            </button>
+            <button class="btn-delete" @click="deleteFromDetails">
+              <span>🗑️</span> Supprimer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import produitsAPI from '../services/produits';
+import categoriesAPI from '../services/categories';
+import fournisseursAPI from '../services/fournisseurs';
+
 export default {
   name: 'ProductsView',
   data() {
@@ -170,89 +428,43 @@ export default {
       selectedCategory: '',
       sortBy: 'name',
       viewMode: 'grid',
-      products: [
-        {
-          id: 1,
-          name: 'Pommes Golden',
-          category: 'Fruits',
-          price: '2.50',
-          unit: 'kg',
-          stock: 45,
-          image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300&h=300&fit=crop'
-        },
-        {
-          id: 2,
-          name: 'Bananes',
-          category: 'Fruits',
-          price: '1.80',
-          unit: 'kg',
-          stock: 8,
-          image: 'https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=300&h=300&fit=crop'
-        },
-        {
-          id: 3,
-          name: 'Carottes Bio',
-          category: 'Légumes',
-          price: '1.20',
-          unit: 'kg',
-          stock: 32,
-          image: 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=300&h=300&fit=crop'
-        },
-        {
-          id: 4,
-          name: 'Lait entier',
-          category: 'Produits laitiers',
-          price: '1.50',
-          unit: 'litre',
-          stock: 5,
-          image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&h=300&fit=crop'
-        },
-        {
-          id: 5,
-          name: 'Tomates cerises',
-          category: 'Légumes',
-          price: '3.20',
-          unit: 'kg',
-          stock: 25,
-          image: 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=300&h=300&fit=crop'
-        },
-        {
-          id: 6,
-          name: 'Fromage comté',
-          category: 'Produits laitiers',
-          price: '18.90',
-          unit: 'kg',
-          stock: 15,
-          image: 'https://images.unsplash.com/photo-1452195100486-9cc805987862?w=300&h=300&fit=crop'
-        },
-        {
-          id: 7,
-          name: 'Oranges',
-          category: 'Fruits',
-          price: '2.20',
-          unit: 'kg',
-          stock: 38,
-          image: 'https://images.unsplash.com/photo-1547514701-42782101795e?w=300&h=300&fit=crop'
-        },
-        {
-          id: 8,
-          name: 'Salade verte',
-          category: 'Légumes',
-          price: '1.50',
-          unit: 'pièce',
-          stock: 12,
-          image: 'https://images.unsplash.com/photo-1622206151226-18ca2c9ab4a1?w=300&h=300&fit=crop'
-        }
-      ]
+      products: [],
+      loading: false,
+      error: null,
+      categories: [],
+      showModal: false,
+      showDetailsModal: false,
+      isEditMode: false,
+      submitting: false,
+      selectedProduct: null,
+      categoriesList: [],
+      fournisseursList: [],
+      formData: {
+        nom: '',
+        reference: '',
+        designation: '',
+        prix_unitaire: '',
+        quantite_en_stock: '',
+        seuil_de_reapprovisionnement: '',
+        date_de_peremption: '',
+        categorie: '',
+        fournisseur: ''
+      }
     }
+  },
+  mounted() {
+    this.loadProducts();
+    this.loadCategories();
+    this.loadFournisseurs();
   },
   computed: {
     filteredProducts() {
       return this.products.filter(product => {
-        const matchesSearch = product.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                             product.category.toLowerCase().includes(this.searchQuery.toLowerCase())
+        const matchesSearch = product.nom.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                             product.categorie_nom.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                             product.designation.toLowerCase().includes(this.searchQuery.toLowerCase())
         const matchesCategory = !this.selectedCategory || 
-                               product.category.toLowerCase() === this.selectedCategory.toLowerCase()
+                               product.categorie_nom.toLowerCase() === this.selectedCategory.toLowerCase()
         return matchesSearch && matchesCategory
       })
     },
@@ -261,42 +473,181 @@ export default {
       return filtered.sort((a, b) => {
         switch(this.sortBy) {
           case 'price':
-            return parseFloat(a.price) - parseFloat(b.price)
+            return parseFloat(a.prix_unitaire) - parseFloat(b.prix_unitaire)
           case 'stock':
-            return b.stock - a.stock
+            return b.quantite_en_stock - a.quantite_en_stock
           default:
-            return a.name.localeCompare(b.name)
+            return a.nom.localeCompare(b.nom)
         }
       })
     },
     availableProducts() {
-      return this.products.filter(p => p.stock > 10).length
+      return this.products.filter(p => p.quantite_en_stock > p.seuil_de_reapprovisionnement).length
     },
     lowStockProducts() {
-      return this.products.filter(p => p.stock <= 10).length
+      return this.products.filter(p => p.est_sous_seuil || p.atteint_seuil).length
     },
     totalValue() {
-      return this.products.reduce((sum, p) => sum + (parseFloat(p.price) * p.stock), 0).toFixed(2)
+      return this.products.reduce((sum, p) => sum + (parseFloat(p.prix_unitaire) * p.quantite_en_stock), 0).toFixed(2)
+    },
+    uniqueCategories() {
+      const categoriesSet = new Set(this.products.map(p => p.categorie_nom));
+      return Array.from(categoriesSet).sort();
     }
   },
   methods: {
+    async loadProducts() {
+      this.loading = true;
+      this.error = null;
+      try {
+        const response = await produitsAPI.getAllProduits();
+        this.products = response.data;
+      } catch (error) {
+        console.error('Erreur lors du chargement des produits:', error);
+        this.error = 'Impossible de charger les produits. Veuillez réessayer.';
+        this.products = [];
+      } finally {
+        this.loading = false;
+      }
+    },
+    async loadCategories() {
+      try {
+        const response = await categoriesAPI.getAllCategories();
+        this.categoriesList = response.data;
+      } catch (error) {
+        console.error('Erreur lors du chargement des catégories:', error);
+      }
+    },
+    async loadFournisseurs() {
+      try {
+        const response = await fournisseursAPI.getAllFournisseurs();
+        this.fournisseursList = response.data;
+      } catch (error) {
+        console.error('Erreur lors du chargement des fournisseurs:', error);
+      }
+    },
     getStockPercentage(stock) {
-      const max = 50
-      return Math.min((stock / max) * 100, 100)
+      const max = 100;
+      return Math.min((stock / max) * 100, 100);
     },
     showAddModal() {
-      console.log('Ouvrir modal d\'ajout')
+      this.isEditMode = false;
+      this.resetForm();
+      this.showModal = true;
     },
-    editProduct(product) {
-      console.log('Modifier produit:', product.name)
+    async editProduct(product) {
+      this.isEditMode = true;
+      this.selectedProduct = product;
+      this.formData = {
+        nom: product.nom,
+        reference: product.reference,
+        designation: product.designation,
+        prix_unitaire: product.prix_unitaire,
+        quantite_en_stock: product.quantite_en_stock,
+        seuil_de_reapprovisionnement: product.seuil_de_reapprovisionnement,
+        date_de_peremption: product.date_de_peremption,
+        categorie: product.categorie,
+        fournisseur: product.fournisseur
+      };
+      this.showModal = true;
     },
     viewProduct(product) {
-      console.log('Voir détails:', product.name)
+      this.selectedProduct = product;
+      this.showDetailsModal = true;
     },
-    deleteProduct(product) {
-      if (confirm(`Supprimer ${product.name} ?`)) {
-        console.log('Supprimer:', product.name)
+    closeModal() {
+      this.showModal = false;
+      this.resetForm();
+    },
+    closeDetailsModal() {
+      this.showDetailsModal = false;
+      this.selectedProduct = null;
+    },
+    resetForm() {
+      this.formData = {
+        nom: '',
+        reference: '',
+        designation: '',
+        prix_unitaire: '',
+        quantite_en_stock: '',
+        seuil_de_reapprovisionnement: '',
+        date_de_peremption: '',
+        categorie: '',
+        fournisseur: ''
+      };
+      this.selectedProduct = null;
+    },
+    async submitProduct() {
+      this.submitting = true;
+      try {
+        if (this.isEditMode) {
+          await produitsAPI.updateProduit(this.selectedProduct.id_product, this.formData);
+          this.showNotification('success', `Le produit "${this.formData.nom}" a été mis à jour avec succès.`);
+        } else {
+          await produitsAPI.createProduit(this.formData);
+          this.showNotification('success', `Le produit "${this.formData.nom}" a été ajouté avec succès.`);
+        }
+        this.closeModal();
+        await this.loadProducts();
+      } catch (error) {
+        console.error('Erreur lors de la soumission:', error);
+        const message = this.isEditMode 
+          ? 'Impossible de mettre à jour le produit.' 
+          : 'Impossible d\'ajouter le produit.';
+        this.showNotification('error', message);
+      } finally {
+        this.submitting = false;
       }
+    },
+    async deleteProduct(product) {
+      if (confirm(`Êtes-vous sûr de vouloir supprimer "${product.nom}" ?`)) {
+        try {
+          await produitsAPI.deleteProduit(product.id_product);
+          this.showNotification('success', `Le produit "${product.nom}" a été supprimé avec succès.`);
+          await this.loadProducts();
+        } catch (error) {
+          console.error('Erreur lors de la suppression:', error);
+          this.showNotification('error', 'Impossible de supprimer le produit. Veuillez réessayer.');
+        }
+      }
+    },
+    editFromDetails() {
+      this.closeDetailsModal();
+      this.editProduct(this.selectedProduct);
+    },
+    async deleteFromDetails() {
+      const product = this.selectedProduct;
+      this.closeDetailsModal();
+      await this.deleteProduct(product);
+    },
+    showNotification(type, message) {
+      // Émet un événement pour afficher une notification
+      this.$emit('show-notification', { type, message });
+      // Alternative: afficher une alerte simple
+      if (type === 'error') {
+        alert('❌ ' + message);
+      } else {
+        alert('✅ ' + message);
+      }
+    },
+    formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      return new Date(dateString).toLocaleDateString('fr-FR', options);
+    },
+    getProductImage(product) {
+      // Image par défaut basée sur la catégorie
+      const categoryImages = {
+        'BOISSON': 'https://images.unsplash.com/photo-1437418747212-8d9709afab22?w=300&h=300&fit=crop',
+        'FRUITS': 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300&h=300&fit=crop',
+        'LÉGUMES': 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=300&h=300&fit=crop',
+        'PRODUITS LAITIERS': 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300&h=300&fit=crop',
+        'VIANDES': 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=300&h=300&fit=crop',
+        'POISSONS': 'https://images.unsplash.com/photo-1535140728325-a4d3707eee61?w=300&h=300&fit=crop',
+        'ÉPICERIE': 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=300&fit=crop',
+        'HYGIÈNE': 'https://images.unsplash.com/photo-1556228578-dd165a1d5b31?w=300&h=300&fit=crop'
+      };
+      return categoryImages[product.categorie_nom.toUpperCase()] || 'https://images.unsplash.com/photo-1523294587484-bae6cc870010?w=300&h=300&fit=crop';
     }
   }
 }
@@ -814,6 +1165,65 @@ export default {
   color: white;
 }
 
+/* ==================== LOADING STATE ==================== */
+.loading-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-state p {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* ==================== ERROR STATE ==================== */
+.error-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 16px;
+  border: 2px solid #fee2e2;
+}
+
+.error-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+
+.error-state h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #ef4444;
+  margin-bottom: 8px;
+}
+
+.error-state p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 24px;
+}
+
 /* ==================== EMPTY STATE ==================== */
 .empty-state {
   text-align: center;
@@ -925,5 +1335,334 @@ export default {
     flex-direction: row;
     min-width: auto;
   }
+
+  .modal-content {
+    width: 95%;
+    max-height: 95vh;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .details-modal {
+    width: 95%;
+  }
+}
+
+/* ==================== MODAL STYLES ==================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.close-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.modal-body {
+  padding: 24px;
+  max-height: calc(90vh - 180px);
+  overflow-y: auto;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #111827;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-cancel,
+.btn-submit {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.btn-submit {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==================== DETAILS MODAL ==================== */
+.details-modal {
+  max-width: 700px;
+}
+
+.details-body {
+  padding: 24px;
+}
+
+.details-image {
+  width: 100%;
+  height: 250px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 24px;
+  background: #f3f4f6;
+}
+
+.details-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.detail-value.price {
+  font-size: 18px;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.detail-value.text-danger {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.badge-cat {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #f3f4f6;
+  color: #6b7280;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.status-badge.success {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.status-badge.warning {
+  background: #fed7aa;
+  color: #d97706;
+}
+
+.status-badge.danger {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.details-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-edit,
+.btn-delete {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-edit {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-delete {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.btn-delete:hover {
+  background: #ef4444;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 </style>
