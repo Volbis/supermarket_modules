@@ -2,7 +2,6 @@
   <div class="statistics-page">
     <!-- En-tête avec filtres -->
     <div class="page-header">
-      <h1 class="page-title">Statistiques</h1>
       <div class="filters-container">
         <select v-model="dateFilter" class="filter-select">
           <option value="7">7 derniers jours</option>

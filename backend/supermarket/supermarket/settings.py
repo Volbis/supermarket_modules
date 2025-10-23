@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'Users',
     'corsheaders',
     'rest_framework',
+    'django_filters',  # Ajouté pour les filtres DRF
 ]
 
 MIDDLEWARE = [
@@ -132,19 +133,12 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:8080',
     'http://localhost:8081',
     'http://localhost:8082',
-    'http://localhost:8083',
-    'http://localhost:8084',
-    'http://localhost:8085',
-    'http://localhost:8086',
-    'http://localhost:8087',
-    'http://localhost:8088',
-    'http://localhost:8089',
 ]
 
 CORS_ALLOW_CREDENTIALS = True

@@ -68,6 +68,7 @@ import Notifications from '@/views/Notifications.vue'
 import Products from '@/views/Products.vue'
 import Suppliers from '@/views/Suppliers.vue'
 import Dashboard from '@/views/Dashboard.vue'
+import Categories from '@/views/Categories.vue'
 
 export default {
   name: 'App',
@@ -77,7 +78,8 @@ export default {
     Notifications,
     Products,
     Suppliers,
-    Dashboard
+    Dashboard,
+    Categories
   },
   data() {
     return {
@@ -124,6 +126,14 @@ export default {
           component: 'Notifications',
           title: 'Notifications',
           subtitle: 'Restez informé des dernières activités'
+        },
+        { 
+          name: 'Catégories', 
+          icon: require('@/assets/icons/produit.png'),
+          active: false,
+          component: 'Categories',
+          title: 'Catégories',
+          subtitle: 'Gérez les catégories de produits'
         },
         { 
           name: 'Produits', 

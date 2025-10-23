@@ -3,8 +3,8 @@ from django.shortcuts import render
 # Create your views here.
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response 
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -34,7 +34,7 @@ class CategorieViewSet(viewsets.ModelViewSet):
     """
     queryset = Categorie.objects.all()
     serializer_class = CategorieSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]  # Modifié pour le développement
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['nom', 'description']
     ordering_fields = ['nom']
@@ -71,7 +71,7 @@ class FournisseurViewSet(viewsets.ModelViewSet):
     """
     queryset = Fournisseur.objects.all()
     serializer_class = FournisseurSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['nom', 'contact', 'adresse']
     ordering_fields = ['nom', 'delais_livraison_jours']
@@ -145,7 +145,7 @@ class ProduitViewSet(viewsets.ModelViewSet):
     """
     queryset = Produit.objects.all()
     serializer_class = ProduitSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['categorie', 'fournisseur']
     search_fields = ['nom', 'reference', 'designation']
@@ -153,7 +153,7 @@ class ProduitViewSet(viewsets.ModelViewSet):
     ordering = ['nom']
 
     @action(detail=False, methods=['get'])
-    def sous_seuil(self, request):
+    def sous_seuil(self, request): 
         """
         Action pour récupérer tous les produits sous le seuil de réapprovisionnement.
         GET /api/produits/sous-seuil/list/
@@ -292,7 +292,7 @@ class StockViewSet(viewsets.ModelViewSet):
     """
     queryset = Stock.objects.all()
     serializer_class = StockSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['produit']
     ordering_fields = ['quantite', 'date_ajout', 'date_modification']
@@ -369,7 +369,7 @@ class CommandeApprovisionnementViewSet(viewsets.ModelViewSet):
     """
     queryset = CommandeApprovisionnement.objects.all()
     serializer_class = CommandeApprovisionnementSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['fournisseur', 'statut']
     ordering_fields = ['date_commande', 'date_livraison_prevue', 'statut']
@@ -468,7 +468,7 @@ class DetailCommandeViewSet(viewsets.ModelViewSet):
     """
     queryset = DetailCommande.objects.all()
     serializer_class = DetailCommandeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['commande', 'produit']
     ordering_fields = ['quantite', 'produit__prix_unitaire']
@@ -489,7 +489,7 @@ class AlertStockViewSet(viewsets.ModelViewSet):
     """
     queryset = AlertStock.objects.all()
     serializer_class = AlertStockSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['produit']
     search_fields = ['message', 'produit__nom']
@@ -530,7 +530,7 @@ class HistoriqueStockViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = HistoriqueStock.objects.all()
     serializer_class = HistoriqueStockSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['produit', 'type_modification']
     ordering_fields = ['date_modification', 'quantite_modifiee']
@@ -621,7 +621,7 @@ class ResponsableStockViewSet(viewsets.ModelViewSet):
     """
     queryset = ResponsableStock.objects.all()
     serializer_class = ResponsableStockSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [SearchFilter, OrderingFilter]
     search_fields = ['nom', 'email', 'telephone']
     ordering_fields = ['nom', 'email']
@@ -704,7 +704,7 @@ class HistoriqueVenteViewSet(viewsets.ReadOnlyModelViewSet):
     """
     queryset = HistoriqueVente.objects.all()
     serializer_class = HistoriqueVenteSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_fields = ['produit']
     ordering_fields = ['date_vente', 'montant_total', 'quantite_vendue']

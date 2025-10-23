@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+import uuid
 
 # Create your models here.
 
@@ -7,7 +8,7 @@ from django.utils import timezone
 # la classe produit 
 
 class Produit(models.Model):
-      id_product = models.UUIDField(primary_key=True, editable=False)
+      id_product = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       nom = models.CharField(max_length=255)
       reference = models.CharField(max_length=255, unique=True)
       designation = models.TextField(max_length=500)
@@ -51,7 +52,7 @@ class Categorie(models.Model):
             ('JEUX_VIDEO', 'Jeux vidéo'),
             ('AUTRE', 'Autre')
       ]
-      id_categorie = models.UUIDField(primary_key=True, editable=False)
+      id_categorie = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       nom = models.CharField(max_length=255, choices=TYPE_CHOICES)
       description = models.TextField(max_length=500, null=True, blank=True)
 
@@ -65,7 +66,7 @@ class Categorie(models.Model):
 
 
 class Stock(models.Model):
-      id_stock = models.UUIDField(primary_key=True, editable=False)
+      id_stock = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
       quantite = models.IntegerField()
       date_ajout = models.DateTimeField(auto_now_add=True)
@@ -91,11 +92,10 @@ class Stock(models.Model):
       
       
 class Fournisseur(models.Model):
-      id_fournisseur = models.UUIDField(primary_key=True, editable=False)
+      id_fournisseur = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       nom = models.CharField(max_length=255)
       contact = models.CharField(max_length=255)
       adresse = models.TextField(max_length=500)
-      catalogue_produits = models.TextField(max_length=1000, null=True, blank=True)
       delais_livraison_jours = models.IntegerField()
 
       def getProduitsFournis(self):
@@ -116,7 +116,7 @@ class CommandeApprovisionnement(models.Model):
             ('ANNULEE', 'Annulée')
       ]
 
-      id_commande = models.UUIDField(primary_key=True, editable=False)
+      id_commande = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       fournisseur = models.ForeignKey(Fournisseur, on_delete=models.CASCADE)
       date_commande = models.DateTimeField(auto_now_add=True)
       date_livraison_prevue = models.DateTimeField()
@@ -137,9 +137,8 @@ class CommandeApprovisionnement(models.Model):
             self.statut = 'ANNULEE'
             self.save()
 
-
 class DetailCommande(models.Model):
-      id_detail = models.UUIDField(primary_key=True, editable=False)
+      id_detail = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       commande = models.ForeignKey(CommandeApprovisionnement, on_delete=models.CASCADE)
       produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
       quantite = models.IntegerField()
@@ -150,8 +149,9 @@ class DetailCommande(models.Model):
       def calculerSousTotal(self):
             return self.produit.prix_unitaire * self.quantite
 
+
 class AlertStock(models.Model):
-      id_alert = models.UUIDField(primary_key=True, editable=False)
+      id_alert = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
       message = models.TextField(max_length=500)
       date_creation = models.DateTimeField(auto_now_add=True)
@@ -161,7 +161,7 @@ class AlertStock(models.Model):
 
 
 class HistoriqueStock(models.Model):
-      id_historique = models.UUIDField(primary_key=True, editable=False)
+      id_historique = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
       quantite_modifiee = models.IntegerField()
       date_modification = models.DateTimeField(auto_now_add=True)
@@ -171,7 +171,7 @@ class HistoriqueStock(models.Model):
             return super().__str__() + f" - {self.type_modification} de {self.quantite_modifiee} pour {self.produit.nom}"
 
 class ResponsableStock(models.Model):
-      id_responsable = models.UUIDField(primary_key=True, editable=False)
+      id_responsable = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       nom = models.CharField(max_length=255)
       email = models.EmailField(unique=True)
       telephone = models.CharField(max_length=20)
@@ -196,7 +196,7 @@ class ResponsableStock(models.Model):
             return rapport
       
 class HistoriqueVente(models.Model):
-      id_historique_vente = models.UUIDField(primary_key=True, editable=False)
+      id_historique_vente = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
       produit = models.ForeignKey(Produit, on_delete=models.CASCADE)
       quantite_vendue = models.IntegerField()
       date_vente = models.DateTimeField(auto_now_add=True)
