@@ -137,7 +137,6 @@ class CommandeApprovisionnement(models.Model):
             self.statut = 'ANNULEE'
             self.save()
 
-
 class DetailCommande(models.Model):
       id_detail = models.UUIDField(primary_key=True, editable=False)
       commande = models.ForeignKey(CommandeApprovisionnement, on_delete=models.CASCADE)
@@ -149,6 +148,7 @@ class DetailCommande(models.Model):
       
       def calculerSousTotal(self):
             return self.produit.prix_unitaire * self.quantite
+
 
 class AlertStock(models.Model):
       id_alert = models.UUIDField(primary_key=True, editable=False)
