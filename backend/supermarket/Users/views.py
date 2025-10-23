@@ -125,7 +125,7 @@ def change_password(request):
 class UserListView(generics.ListAPIView):
     """
     Liste de tous les utilisateurs
-    GET /api/users/
+    GET /api/users/ 
     """
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer

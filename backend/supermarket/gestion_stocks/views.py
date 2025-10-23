@@ -516,14 +516,16 @@ class AlertStockViewSet(viewsets.ModelViewSet):
         })
 
 
-class HistoriqueStockViewSet(viewsets.ReadOnlyModelViewSet):
+class HistoriqueStockViewSet(viewsets.ModelViewSet):
     """
-    ViewSet pour consulter l'historique des modifications de stock.
-    (Lecture seule - pas de création/modification/suppression)
+    ViewSet pour gérer l'historique des modifications de stock.
     
     Endpoints:
     - GET /api/historique-stock/ : Lister tout l'historique
+    - POST /api/historique-stock/ : Créer un nouvel enregistrement
     - GET /api/historique-stock/{id}/ : Récupérer un enregistrement
+    - PUT /api/historique-stock/{id}/ : Modifier un enregistrement
+    - DELETE /api/historique-stock/{id}/ : Supprimer un enregistrement
     - GET /api/historique-stock/produit/detail/ : Historique d'un produit
     - GET /api/historique-stock/type/ajouts/ : Historique des ajouts
     - GET /api/historique-stock/type/retraits/ : Historique des retraits
@@ -690,14 +692,16 @@ class ResponsableStockViewSet(viewsets.ModelViewSet):
         })
 
 
-class HistoriqueVenteViewSet(viewsets.ReadOnlyModelViewSet):
+class HistoriqueVenteViewSet(viewsets.ModelViewSet):
     """
-    ViewSet pour consulter l'historique des ventes.
-    (Lecture seule - pas de création/modification/suppression)
+    ViewSet pour gérer l'historique des ventes.
     
     Endpoints:
     - GET /api/historique-ventes/ : Lister tout l'historique
+    - POST /api/historique-ventes/ : Créer une nouvelle vente
     - GET /api/historique-ventes/{id}/ : Récupérer une vente
+    - PUT /api/historique-ventes/{id}/ : Modifier une vente
+    - DELETE /api/historique-ventes/{id}/ : Supprimer une vente
     - GET /api/historique-ventes/par-produit/detail/ : Ventes d'un produit
     - GET /api/historique-ventes/par-periode/detail/ : Ventes sur une période
     - GET /api/historique-ventes/statistiques/chiffre-affaires/ : Chiffre d'affaires

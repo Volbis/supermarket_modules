@@ -10,20 +10,6 @@
           <option value="365">1 an</option>
         </select>
         
-        <select v-model="categoryFilter" @change="loadStatistics" class="filter-select">
-          <option value="all">Toutes catégories</option>
-          <option value="electronics">Électronique</option>
-          <option value="clothes">Vêtements</option>
-          <option value="food">Alimentaire</option>
-        </select>
-        
-        <select v-model="statusFilter" @change="loadStatistics" class="filter-select">
-          <option value="all">Tous statuts</option>
-          <option value="delivered">Livrées</option>
-          <option value="pending">En cours</option>
-          <option value="cancelled">Annulées</option>
-        </select>
-        
         <button class="export-btn" @click="exportData">
           📥 Exporter
         </button>
@@ -34,6 +20,12 @@
     <div v-if="loading" class="loading-state">
       <div class="spinner"></div>
       <p>Chargement des statistiques...</p>
+    </div>
+
+    <!-- Message d'erreur -->
+    <div v-else-if="error" class="error-state">
+      <p class="error-message">{{ error }}</p>
+      <button @click="loadStatistics" class="retry-btn">Réessayer</button>
     </div>
 
     <!-- Contenu principal -->
@@ -73,6 +65,8 @@
           </div>
         </div>
       </div>
+      
+      <!-- Graphiques principaux -->
       
       <!-- Graphiques principaux -->
       <div class="charts-container">
@@ -127,7 +121,7 @@
           <!-- Top produits -->
           <div class="top-products">
             <h4 class="section-subtitle">Top 5 Produits</h4>
-            <div class="products-list">
+            <div v-if="topProducts.length > 0" class="products-list">
               <div v-for="(product, index) in topProducts" :key="index" class="product-item">
                 <div class="product-rank">{{ index + 1 }}</div>
                 <div class="product-info">
@@ -136,6 +130,9 @@
                 </div>
                 <span class="product-revenue">{{ formatCurrency(product.revenue) }}</span>
               </div>
+            </div>
+            <div v-else class="no-data">
+              <p>Aucune donnée de vente disponible</p>
             </div>
           </div>
         </div>
@@ -198,9 +195,8 @@ export default {
   data() {
     return {
       loading: true,
+      error: null,
       dateFilter: '30',
-      categoryFilter: 'all',
-      statusFilter: 'all',
       
       // Données brutes de l'API
       ventesData: [],
@@ -263,17 +259,28 @@ export default {
   methods: {
     async loadStatistics() {
       this.loading = true;
+      this.error = null;
+      
       try {
         // Calculer les dates selon le filtre
-        const { dateDebut, dateFin } = this.calculateDateRange();
+        const { dateDebut } = this.calculateDateRange();
         
         // Charger les données de ventes
-        const ventesResponse = await historiqueVentesAPI.getVentesByPeriode(dateDebut, dateFin);
-        this.ventesData = ventesResponse.data.ventes || [];
+        //const ventesResponse = await historiqueVentesAPI.getVentesByPeriode(dateDebut, dateFin);
+        const ventesResponse = await historiqueVentesAPI.getAllHistoriqueVentes();
+
+        console.log('Réponse API ventes:', ventesResponse);
+        
+        // Adapter selon la structure de votre API
+        this.ventesData = ventesResponse.data?.ventes || ventesResponse.data || [];
         
         // Charger les données d'historique stock
         const stockResponse = await historiqueStockAPI.getAllHistoriqueStock();
+        console.log('Réponse API stock:', stockResponse);
         this.stockData = stockResponse.data || [];
+        
+        // Charger aussi la période précédente pour calculer la croissance
+        await this.loadPreviousPeriodData(dateDebut);
         
         // Calculer les statistiques
         this.calculateKPIs();
@@ -286,14 +293,52 @@ export default {
         // Mettre à jour les graphiques
         this.$nextTick(() => {
           this.destroyCharts();
-          this.initCharts();
+          
+          // Attendre un peu pour s'assurer que le DOM est bien rendu
+          setTimeout(() => {
+            console.log('Initialisation des graphiques...');
+            this.initCharts();
+          }, 100);
         });
         
       } catch (error) {
         console.error('Erreur lors du chargement des statistiques:', error);
-        this.$toast?.error('Erreur lors du chargement des statistiques');
+        this.error = 'Erreur lors du chargement des données. Veuillez réessayer.';
+        
+        if (this.$toast) {
+          this.$toast.error('Erreur lors du chargement des statistiques');
+        }
       } finally {
         this.loading = false;
+      }
+    },
+    
+    async loadPreviousPeriodData(dateDebut) {
+      try {
+        const days = parseInt(this.dateFilter);
+        const previousDateFin = new Date(dateDebut);
+        previousDateFin.setDate(previousDateFin.getDate() - 1);
+        
+        const previousDateDebut = new Date(previousDateFin);
+        previousDateDebut.setDate(previousDateDebut.getDate() - days);
+        
+        const previousResponse = await historiqueVentesAPI.getVentesByPeriode(
+          this.formatDate(previousDateDebut),
+          this.formatDate(previousDateFin)
+        );
+        
+        const previousVentes = previousResponse.data?.ventes || previousResponse.data || [];
+        
+        this.previousPeriodData.orders = previousVentes.length;
+        this.previousPeriodData.revenue = previousVentes.reduce((sum, vente) => {
+          return sum + parseFloat(vente.montant_total || 0);
+        }, 0);
+        this.previousPeriodData.products = previousVentes.reduce((sum, vente) => {
+          return sum + parseInt(vente.quantite_vendue || 0);
+        }, 0);
+      } catch (error) {
+        console.error('Erreur lors du chargement de la période précédente:', error);
+        // Continuer même en cas d'erreur
       }
     },
     
@@ -365,6 +410,14 @@ export default {
       // Simulation de répartition des statuts (à adapter selon vos données)
       const total = this.filteredOrdersCount;
       
+      if (total === 0) {
+        this.orderStatuses.forEach(status => {
+          status.count = 0;
+          status.percentage = 0;
+        });
+        return;
+      }
+      
       this.orderStatuses[0].count = Math.floor(total * 0.64); // Livrées
       this.orderStatuses[1].count = Math.floor(total * 0.23); // En cours
       this.orderStatuses[2].count = Math.floor(total * 0.10); // En attente
@@ -391,13 +444,29 @@ export default {
     },
     
     calculateGrowth(type) {
-      // Simulation de croissance (à calculer avec données période précédente)
-      const growthRates = {
-        orders: 12.5,
-        revenue: 18.2,
-        products: 8.3
-      };
-      return growthRates[type] || 0;
+      let currentValue, previousValue;
+      
+      switch(type) {
+        case 'orders':
+          currentValue = this.filteredOrdersCount;
+          previousValue = this.previousPeriodData.orders;
+          break;
+        case 'revenue':
+          currentValue = this.totalRevenue;
+          previousValue = this.previousPeriodData.revenue;
+          break;
+        case 'products':
+          currentValue = this.totalProductsSold;
+          previousValue = this.previousPeriodData.products;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (previousValue === 0) return 0;
+      
+      const growth = ((currentValue - previousValue) / previousValue) * 100;
+      return Math.abs(growth).toFixed(1);
     },
     
     destroyCharts() {
@@ -407,24 +476,48 @@ export default {
     },
     
     initCharts() {
-      this.createOrdersChart();
-      this.createProductsChart();
-      this.createSuppliersChart();
+      console.log('=== INITIALISATION DES GRAPHIQUES ===');
+      console.log('ventesData:', this.ventesData.length);
+      console.log('topProducts:', this.topProducts.length);
+      console.log('suppliers:', this.suppliers.length);
+      
+      try {
+        this.createOrdersChart();
+        this.createProductsChart();
+        this.createSuppliersChart();
+        console.log('✅ Graphiques créés avec succès');
+      } catch (error) {
+        console.error('❌ Erreur lors de la création des graphiques:', error);
+      }
     },
     
     createOrdersChart() {
-      const ctx = this.$refs.ordersChart?.getContext('2d');
-      if (!ctx) return;
+      const canvas = this.$refs.ordersChart;
+      console.log('Canvas ordersChart:', canvas);
       
-      // Grouper les ventes par mois
-      const salesByMonth = this.groupSalesByMonth();
+      if (!canvas) {
+        console.error('Canvas ordersChart non trouvé');
+        return;
+      }
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Contexte 2D non disponible');
+        return;
+      }
+      
+      console.log('Création du graphique des commandes...');
+      
+      // Grouper les ventes par période (jour, semaine ou mois selon le filtre)
+      const salesByPeriod = this.groupSalesByPeriod();
+      console.log('Données groupées:', salesByPeriod);
       
       const data = {
-        labels: salesByMonth.labels,
+        labels: salesByPeriod.labels,
         datasets: [
           {
             label: 'Commandes',
-            data: salesByMonth.orders,
+            data: salesByPeriod.orders,
             backgroundColor: '#3B82F6',
             borderColor: '#2563eb',
             borderWidth: 2,
@@ -433,7 +526,7 @@ export default {
           },
           {
             label: 'Revenus (÷1000)',
-            data: salesByMonth.revenue.map(v => v / 1000),
+            data: salesByPeriod.revenue.map(v => v / 1000),
             backgroundColor: '#10B981',
             borderColor: '#059669',
             borderWidth: 2,
@@ -443,16 +536,35 @@ export default {
         ]
       };
       
-      this.ordersChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: data,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
+      try {
+        this.ordersChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: data,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
           plugins: {
             legend: {
               display: true,
               position: 'top'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  let label = context.dataset.label || '';
+                  if (label) {
+                    label += ': ';
+                  }
+                  if (context.parsed.y !== null) {
+                    if (context.dataset.label === 'Revenus (÷1000)') {
+                      label += (context.parsed.y * 1000).toFixed(0) + ' XOF';
+                    } else {
+                      label += context.parsed.y;
+                    }
+                  }
+                  return label;
+                }
+              }
             }
           },
           scales: {
@@ -470,43 +582,95 @@ export default {
           }
         }
       });
+      
+      console.log('✅ Graphique des commandes créé');
+      } catch (error) {
+        console.error('❌ Erreur création graphique commandes:', error);
+      }
     },
     
-    groupSalesByMonth() {
-      const monthMap = {};
-      const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+    groupSalesByPeriod() {
+      const periodMap = {};
+      const days = parseInt(this.dateFilter);
+      
+      // Choisir le format selon la période
+      let formatDate;
+      if (days <= 7) {
+        // Par jour pour 7 jours
+        formatDate = (date) => {
+          const options = { weekday: 'short', day: 'numeric' };
+          return new Date(date).toLocaleDateString('fr-FR', options);
+        };
+      } else if (days <= 90) {
+        // Par semaine pour 30-90 jours
+        formatDate = (date) => {
+          const d = new Date(date);
+          const weekNum = Math.ceil((d.getDate()) / 7);
+          return `S${weekNum} ${d.toLocaleDateString('fr-FR', { month: 'short' })}`;
+        };
+      } else {
+        // Par mois pour 1 an
+        formatDate = (date) => {
+          return new Date(date).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' });
+        };
+      }
       
       this.ventesData.forEach(vente => {
-        const date = new Date(vente.date_vente);
-        const monthKey = `${monthNames[date.getMonth()]}`;
+        const dateKey = formatDate(vente.date_vente);
         
-        if (!monthMap[monthKey]) {
-          monthMap[monthKey] = { orders: 0, revenue: 0 };
+        if (!periodMap[dateKey]) {
+          periodMap[dateKey] = { orders: 0, revenue: 0 };
         }
         
-        monthMap[monthKey].orders++;
-        monthMap[monthKey].revenue += parseFloat(vente.montant_total || 0);
+        periodMap[dateKey].orders++;
+        periodMap[dateKey].revenue += parseFloat(vente.montant_total || 0);
       });
       
-      const labels = Object.keys(monthMap);
-      const orders = labels.map(label => monthMap[label].orders);
-      const revenue = labels.map(label => monthMap[label].revenue);
+      const labels = Object.keys(periodMap);
+      const orders = labels.map(label => periodMap[label].orders);
+      const revenue = labels.map(label => periodMap[label].revenue);
+      
+      // Si aucune donnée, retourner des valeurs par défaut
+      if (labels.length === 0) {
+        return {
+          labels: ['Aucune donnée'],
+          orders: [0],
+          revenue: [0]
+        };
+      }
       
       return { labels, orders, revenue };
     },
     
     createProductsChart() {
-      const ctx = this.$refs.productsChart?.getContext('2d');
-      if (!ctx) return;
+      const canvas = this.$refs.productsChart;
+      console.log('Canvas productsChart:', canvas);
+      
+      if (!canvas) {
+        console.error('Canvas productsChart non trouvé');
+        return;
+      }
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Contexte 2D non disponible pour productsChart');
+        return;
+      }
+      
+      console.log('Création du graphique des produits...');
       
       // Utiliser les données des top produits
-      const labels = this.topProducts.map(p => p.name);
-      const dataValues = this.topProducts.map(p => p.revenue);
+      const labels = this.topProducts.length > 0 
+        ? this.topProducts.map(p => p.name) 
+        : ['Aucune donnée'];
+      const dataValues = this.topProducts.length > 0
+        ? this.topProducts.map(p => p.revenue)
+        : [1];
       
       const data = {
-        labels: labels.length > 0 ? labels : ['Aucune donnée'],
+        labels: labels,
         datasets: [{
-          data: dataValues.length > 0 ? dataValues : [1],
+          data: dataValues,
           backgroundColor: [
             '#3B82F6',
             '#10B981',
@@ -518,25 +682,53 @@ export default {
         }]
       };
       
-      this.productsChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: data,
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
+      try {
+        this.productsChartInstance = new Chart(ctx, {
+          type: 'doughnut',
+          data: data,
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
           plugins: {
             legend: {
               display: true,
               position: 'bottom'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const label = context.label || '';
+                  const value = context.parsed || 0;
+                  return label + ': ' + value.toFixed(0) + ' XOF';
+                }
+              }
             }
           }
         }
       });
+      
+      console.log('✅ Graphique des produits créé');
+      } catch (error) {
+        console.error('❌ Erreur création graphique produits:', error);
+      }
     },
     
     createSuppliersChart() {
-      const ctx = this.$refs.suppliersChart?.getContext('2d');
-      if (!ctx) return;
+      const canvas = this.$refs.suppliersChart;
+      console.log('Canvas suppliersChart:', canvas);
+      
+      if (!canvas) {
+        console.error('Canvas suppliersChart non trouvé');
+        return;
+      }
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        console.error('Contexte 2D non disponible pour suppliersChart');
+        return;
+      }
+      
+      console.log('Création du graphique des fournisseurs...');
       
       const data = {
         labels: this.suppliers.map(s => s.name),
@@ -548,13 +740,14 @@ export default {
         }]
       };
       
-      this.suppliersChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: data,
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
+      try {
+        this.suppliersChartInstance = new Chart(ctx, {
+          type: 'bar',
+          data: data,
+          options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
           plugins: {
             legend: {
               display: false
@@ -576,6 +769,11 @@ export default {
           }
         }
       });
+      
+      console.log('✅ Graphique des fournisseurs créé');
+      } catch (error) {
+        console.error('❌ Erreur création graphique fournisseurs:', error);
+      }
     },
     
     formatCurrency(value) {
@@ -593,6 +791,13 @@ export default {
     },
     
     exportData() {
+      if (this.ventesData.length === 0) {
+        if (this.$toast) {
+          this.$toast.warning('Aucune donnée à exporter');
+        }
+        return;
+      }
+      
       // Créer un CSV avec les données
       const csvData = this.ventesData.map(vente => ({
         Date: vente.date_vente,
@@ -602,12 +807,14 @@ export default {
       }));
       
       const csv = this.convertToCSV(csvData);
-      const blob = new Blob([csv], { type: 'text/csv' });
+      const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `statistiques-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     },
     
@@ -615,7 +822,7 @@ export default {
       if (data.length === 0) return '';
       
       const headers = Object.keys(data[0]).join(',');
-      const rows = data.map(row => Object.values(row).join(','));
+      const rows = data.map(row => Object.values(row).map(val => `"${val}"`).join(','));
       
       return [headers, ...rows].join('\n');
     }
@@ -624,6 +831,7 @@ export default {
 </script>
 
 <style scoped>
+/* Reprise du CSS existant avec ajout pour les erreurs */
 .statistics-page {
   padding: 24px;
   background: linear-gradient(135deg, #f5f7fa 0%, #e8ecf1 100%);
@@ -656,6 +864,52 @@ export default {
 .loading-state p {
   color: #64748b;
   font-size: 16px;
+}
+
+/* État d'erreur */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 16px;
+}
+
+.error-message {
+  color: #EF4444;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.retry-btn {
+  padding: 10px 20px;
+  background: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.retry-btn:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.no-data {
+  padding: 32px;
+  text-align: center;
+  color: #64748b;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.no-data p {
+  margin: 0;
+  font-size: 14px;
 }
 
 /* En-tête */
@@ -737,8 +991,8 @@ export default {
 }
 
 .chart-card {
-  padding: 10px;
-  min-height: 300px;
+  padding: 24px;
+  min-height: 400px;
 }
 
 .dashboard-card:hover {
@@ -800,13 +1054,22 @@ export default {
 
 /* Graphiques */
 .chart-container {
-  height: 220px;
-  margin-bottom: 16px;
+  height: 300px;
+  margin-bottom: 24px;
+  position: relative;
 }
 
 .chart-section {
-  height: 220px;
-  margin-bottom: 16px;
+  height: 300px;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.chart-container canvas,
+.chart-section canvas,
+.suppliers-chart canvas {
+  max-width: 100%;
+  max-height: 100%;
 }
 
 /* Stats grid */
@@ -884,6 +1147,10 @@ export default {
 }
 
 /* Produits */
+.top-products {
+  margin-top: 16px;
+}
+
 .section-subtitle {
   font-size: 16px;
   font-weight: 600;
@@ -923,6 +1190,7 @@ export default {
   justify-content: center;
   font-weight: 700;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
 .product-info {
@@ -956,7 +1224,8 @@ export default {
 }
 
 .suppliers-chart {
-  height: 250px;
+  height: 300px;
+  position: relative;
 }
 
 .suppliers-table {

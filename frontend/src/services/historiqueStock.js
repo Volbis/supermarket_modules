@@ -3,6 +3,8 @@ import api from '../api/api';
 /**
  * Service API pour la gestion de l'historique des stocks
  * Base URL: http://127.0.0.1:8000/api/stocks/historique-stock/
+ * 
+ * ✅ CRÉATION ACTIVÉE - Vous pouvez maintenant créer, modifier et supprimer des mouvements de stock
  */
 
 const historiqueStockAPI = {

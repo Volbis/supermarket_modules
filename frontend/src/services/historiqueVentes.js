@@ -3,6 +3,8 @@ import api from '../api/api';
 /**
  * Service API pour la gestion de l'historique des ventes
  * Base URL: http://127.0.0.1:8000/api/stocks/historique-ventes/
+ * 
+ * ✅ CRÉATION ACTIVÉE - Vous pouvez maintenant créer, modifier et supprimer des ventes
  */
 
 const historiqueVentesAPI = {
