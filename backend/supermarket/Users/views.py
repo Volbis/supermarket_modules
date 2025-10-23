@@ -124,50 +124,31 @@ def change_password(request):
 
 class UserListView(generics.ListAPIView):
     """
-    Liste de tous les utilisateurs (Admin uniquement)
+    Liste de tous les utilisateurs
     GET /api/users/
     """
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        """Filtrer selon le rôle de l'utilisateur"""
-        user = self.request.user
-        if user.role == 'ADMIN':
-            return CustomUser.objects.all()
-        return CustomUser.objects.filter(id=user.id)
 
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
-    Détails, mise à jour et suppression d'un utilisateur (Admin uniquement)
+    Détails, mise à jour et suppression d'un utilisateur
     GET/PUT/PATCH/DELETE /api/users/<id>/
     """
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        """Filtrer selon le rôle de l'utilisateur"""
-        user = self.request.user
-        if user.role == 'ADMIN':
-            return CustomUser.objects.all()
-        return CustomUser.objects.filter(id=user.id)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def deactivate_user(request, user_id):
     """
-    Désactiver un utilisateur (Admin uniquement)
+    Désactiver un utilisateur
     POST /api/users/<id>/deactivate/
     """
-    if request.user.role != 'ADMIN':
-        return Response({
-            'error': 'Permission refusée. Seuls les administrateurs peuvent désactiver des utilisateurs.'
-        }, status=status.HTTP_403_FORBIDDEN)
-    
     try:
         user = CustomUser.objects.get(id=user_id)
         user.is_active = False
@@ -185,14 +166,9 @@ def deactivate_user(request, user_id):
 @permission_classes([IsAuthenticated])
 def activate_user(request, user_id):
     """
-    Activer un utilisateur (Admin uniquement)
+    Activer un utilisateur
     POST /api/users/<id>/activate/
     """
-    if request.user.role != 'ADMIN':
-        return Response({
-            'error': 'Permission refusée. Seuls les administrateurs peuvent activer des utilisateurs.'
-        }, status=status.HTTP_403_FORBIDDEN)
-    
     try:
         user = CustomUser.objects.get(id=user_id)
         user.is_active = True
