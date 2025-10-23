@@ -4,7 +4,7 @@
     <div class="page-header">
       <div class="header-content">
         <div class="title-section">
-          <p class="page-subtitle">{{ filteredSuppliers.length }} fournisseurs • {{ activeSuppliers }} actifs</p>
+          <p class="page-subtitle">{{ filteredSuppliers.length }} fournisseurs</p>
         </div>
         <button class="btn-add" @click="showAddModal">
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -38,22 +38,8 @@
           </svg>
         </div>
         <div class="stat-content">
-          <p class="stat-label">Actifs</p>
-          <p class="stat-value">{{ activeSuppliers }}</p>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-icon" style="background: #FEF2F2;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="15" y1="9" x2="9" y2="15"></line>
-            <line x1="9" y1="9" x2="15" y2="15"></line>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <p class="stat-label">Inactifs</p>
-          <p class="stat-value">{{ inactiveSuppliers }}</p>
+          <p class="stat-label">Produits fournis</p>
+          <p class="stat-value">{{ totalProduits }}</p>
         </div>
       </div>
 
@@ -66,6 +52,19 @@
         <div class="stat-content">
           <p class="stat-label">Commandes</p>
           <p class="stat-value">{{ totalOrders }}</p>
+        </div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-icon" style="background: #FEF2F2;">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 8v4M12 16h.01"></path>
+          </svg>
+        </div>
+        <div class="stat-content">
+          <p class="stat-label">Délai moyen</p>
+          <p class="stat-value">{{ averageDelay }} j</p>
         </div>
       </div>
     </div>
@@ -92,16 +91,10 @@
       </div>
 
       <div class="filters">
-        <select v-model="filterStatus" class="filter-select">
-          <option value="">Tous les statuts</option>
-          <option value="active">Actifs</option>
-          <option value="inactive">Inactifs</option>
-        </select>
-
         <select v-model="sortBy" class="filter-select">
           <option value="name">Nom (A-Z)</option>
           <option value="orders">Commandes</option>
-          <option value="rating">Note</option>
+          <option value="delay">Délai de livraison</option>
         </select>
 
         <div class="view-toggle">
@@ -135,41 +128,49 @@
       </div>
     </div>
 
+    <!-- Message de chargement -->
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Chargement des fournisseurs...</p>
+    </div>
+
+    <!-- Message d'erreur -->
+    <div v-if="error" class="error-state">
+      <div class="error-icon">⚠️</div>
+      <h3>Erreur</h3>
+      <p>{{ error }}</p>
+      <button class="btn-add" @click="loadSuppliers">
+        🔄 Réessayer
+      </button>
+    </div>
+
     <!-- Suppliers Grid -->
-    <div v-if="sortedSuppliers.length > 0" :class="['suppliers-grid', viewMode]">
-      <div v-for="supplier in sortedSuppliers" :key="supplier.id" class="supplier-card">
+    <div v-if="!loading && !error && sortedSuppliers.length > 0" :class="['suppliers-grid', viewMode]">
+      <div v-for="supplier in sortedSuppliers" :key="supplier.id_fournisseur" class="supplier-card">
         <div class="card-header">
-          <div class="avatar" :style="{ background: supplier.color }">
-            {{ getInitials(supplier.name) }}
+          <div class="avatar" :style="{ background: getSupplierColor(supplier.nom) }">
+            {{ getInitials(supplier.nom) }}
           </div>
           <div class="header-info">
-            <h3 class="supplier-name">{{ supplier.name }}</h3>
+            <h3 class="supplier-name">{{ supplier.nom }}</h3>
             <div class="rating">
-              <svg v-for="i in 5" :key="i" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" :fill="i <= supplier.rating ? '#FBBF24' : '#E5E7EB'" stroke="none">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="#FBBF24" stroke="none">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
               </svg>
-              <span class="rating-value">{{ supplier.rating }}/5</span>
+              <span class="rating-value">{{ supplier.produits_count || 0 }} produits</span>
             </div>
           </div>
-          <span :class="['badge', supplier.status]">
-            {{ supplier.status === 'active' ? 'Actif' : 'Inactif' }}
+          <span class="badge active">
+            {{ supplier.delais_livraison_jours }}j
           </span>
         </div>
 
         <div class="card-body">
           <div class="info-row">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-              <polyline points="22,6 12,13 2,6"></polyline>
-            </svg>
-            <span>{{ supplier.email }}</span>
-          </div>
-
-          <div class="info-row">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
             </svg>
-            <span>{{ supplier.phone }}</span>
+            <span>{{ supplier.contact }}</span>
           </div>
 
           <div class="info-row">
@@ -177,19 +178,27 @@
               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
               <circle cx="12" cy="10" r="3"></circle>
             </svg>
-            <span>{{ supplier.location }}</span>
+            <span>{{ supplier.adresse }}</span>
           </div>
 
           <div class="info-row">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
             </svg>
-            <span>{{ supplier.totalOrders }} commandes</span>
+            <span>{{ supplier.commandes_count || 0 }} commandes</span>
+          </div>
+
+          <div class="info-row">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>Délai: {{ supplier.delais_livraison_jours }} jour(s)</span>
           </div>
         </div>
 
-        <div class="tags">
-          <span v-for="(category, index) in supplier.categories" :key="index" class="tag">
+        <div class="tags" v-if="supplier.categories_produits && supplier.categories_produits.length > 0">
+          <span v-for="(category, index) in supplier.categories_produits" :key="index" class="tag">
             {{ category }}
           </span>
         </div>
@@ -212,12 +221,18 @@
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
           </button>
+          <button class="action-btn delete" @click="deleteSupplier(supplier)" title="Supprimer">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
         </div>
       </div>
     </div>
 
     <!-- Empty State -->
-    <div v-else class="empty-state">
+    <div v-if="!loading && !error && sortedSuppliers.length === 0" class="empty-state">
       <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
         <polyline points="9 22 9 12 15 12 15 22"></polyline>
@@ -232,102 +247,197 @@
         <span>Ajouter un fournisseur</span>
       </button>
     </div>
+
+    <!-- Modal Ajout/Édition de fournisseur -->
+    <div v-if="showModal" class="modal-overlay" @click.self="closeModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>{{ isEditMode ? 'Modifier le fournisseur' : 'Ajouter un fournisseur' }}</h3>
+          <button class="close-btn" @click="closeModal">✕</button>
+        </div>
+        
+        <form @submit.prevent="submitSupplier" class="modal-body">
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label for="nom">Nom du fournisseur *</label>
+              <input 
+                type="text" 
+                id="nom" 
+                v-model="formData.nom" 
+                required 
+                placeholder="Ex: Ferme Bio Martin"
+              />
+            </div>
+
+            <div class="form-group full-width">
+              <label for="contact">Contact *</label>
+              <input 
+                type="text" 
+                id="contact" 
+                v-model="formData.contact" 
+                required 
+                placeholder="Ex: +225 01 23 45 67 89 ou email@exemple.com"
+              />
+            </div>
+
+            <div class="form-group full-width">
+              <label for="adresse">Adresse *</label>
+              <textarea 
+                id="adresse" 
+                v-model="formData.adresse" 
+                required 
+                rows="3"
+                placeholder="Adresse complète du fournisseur"
+              ></textarea>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="delais_livraison_jours">Délai de livraison (jours) *</label>
+              <input 
+                type="number" 
+                id="delais_livraison_jours" 
+                v-model="formData.delais_livraison_jours" 
+                required 
+                min="0"
+                placeholder="Ex: 3"
+              />
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-cancel" @click="closeModal">
+              Annuler
+            </button>
+            <button type="submit" class="btn-submit" :disabled="submitting">
+              {{ submitting ? 'Enregistrement...' : (isEditMode ? 'Mettre à jour' : 'Ajouter') }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal Détails du fournisseur -->
+    <div v-if="showDetailsModal" class="modal-overlay" @click.self="closeDetailsModal">
+      <div class="modal-content details-modal">
+        <div class="modal-header">
+          <h3>Détails du fournisseur</h3>
+          <button class="close-btn" @click="closeDetailsModal">✕</button>
+        </div>
+        
+        <div class="modal-body details-body" v-if="selectedSupplier">
+          <div class="supplier-header-detail">
+            <div class="avatar-large" :style="{ background: getSupplierColor(selectedSupplier.nom) }">
+              {{ getInitials(selectedSupplier.nom) }}
+            </div>
+            <div>
+              <h2>{{ selectedSupplier.nom }}</h2>
+              <p class="supplier-subtitle">{{ selectedSupplier.produits_count || 0 }} produits • {{ selectedSupplier.commandes_count || 0 }} commandes</p>
+            </div>
+          </div>
+
+          <div class="details-grid">
+            <div class="detail-item">
+              <span class="detail-label">Contact</span>
+              <span class="detail-value">{{ selectedSupplier.contact }}</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Délai de livraison</span>
+              <span class="detail-value">{{ selectedSupplier.delais_livraison_jours }} jour(s)</span>
+            </div>
+
+            <div class="detail-item full-width">
+              <span class="detail-label">Adresse</span>
+              <span class="detail-value">{{ selectedSupplier.adresse }}</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Produits fournis</span>
+              <span class="detail-value">{{ selectedSupplier.produits_count || 0 }} produit(s)</span>
+            </div>
+
+            <div class="detail-item">
+              <span class="detail-label">Commandes passées</span>
+              <span class="detail-value">{{ selectedSupplier.commandes_count || 0 }} commande(s)</span>
+            </div>
+
+            <div class="detail-item full-width" v-if="selectedSupplier.categories_produits && selectedSupplier.categories_produits.length > 0">
+              <span class="detail-label">Catégories de produits</span>
+              <div class="categories-list">
+                <span v-for="(cat, index) in selectedSupplier.categories_produits" :key="index" class="category-badge">
+                  {{ cat }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="supplierProducts.length > 0" class="products-section">
+            <h4>Produits fournis</h4>
+            <div class="products-list">
+              <div v-for="product in supplierProducts.slice(0, 5)" :key="product.id_product" class="product-item">
+                <span class="product-name">{{ product.nom }}</span>
+                <span class="product-price">{{ product.prix_unitaire }} CFA</span>
+              </div>
+              <p v-if="supplierProducts.length > 5" class="more-products">
+                +{{ supplierProducts.length - 5 }} autres produits
+              </p>
+            </div>
+          </div>
+
+          <div class="details-actions">
+            <button class="btn-edit" @click="editFromDetails">
+              <span>✏️</span> Modifier
+            </button>
+            <button class="btn-delete" @click="deleteFromDetails">
+              <span>🗑️</span> Supprimer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
+import fournisseursAPI from '../services/fournisseurs';
+import produitsAPI from '../services/produits';
+import commandesAPI from '../services/commandes';
+
 export default {
   name: 'FournisseursView',
   data() {
     return {
       searchQuery: '',
-      filterStatus: '',
       sortBy: 'name',
       viewMode: 'grid',
-      suppliers: [
-        {
-          id: 1,
-          name: 'Ferme Bio Martin',
-          email: 'contact@fermebiomartin.fr',
-          phone: '01 23 45 67 89',
-          location: 'Normandie, France',
-          status: 'active',
-          rating: 5,
-          totalOrders: 145,
-          categories: ['Bio', 'Fruits', 'Légumes'],
-          color: '#10b981'
-        },
-        {
-          id: 2,
-          name: 'Légumes du Sud',
-          email: 'info@legumesdusud.com',
-          phone: '04 56 78 90 12',
-          location: 'Provence, France',
-          status: 'active',
-          rating: 4,
-          totalOrders: 98,
-          categories: ['Légumes', 'Local'],
-          color: '#f59e0b'
-        },
-        {
-          id: 3,
-          name: 'Fruits & Co',
-          email: 'hello@fruitsco.fr',
-          phone: '02 34 56 78 90',
-          location: 'Bretagne, France',
-          status: 'inactive',
-          rating: 3,
-          totalOrders: 52,
-          categories: ['Fruits', 'Import'],
-          color: '#ef4444'
-        },
-        {
-          id: 4,
-          name: 'Produits Laitiers Dupont',
-          email: 'contact@laitiersdupont.fr',
-          phone: '03 45 67 89 01',
-          location: 'Auvergne, France',
-          status: 'active',
-          rating: 5,
-          totalOrders: 187,
-          categories: ['Laitier', 'Bio', 'Local'],
-          color: '#3b82f6'
-        },
-        {
-          id: 5,
-          name: 'Epicerie Fine Paris',
-          email: 'info@epiceriefineparis.fr',
-          phone: '01 98 76 54 32',
-          location: 'Paris, France',
-          status: 'active',
-          rating: 4,
-          totalOrders: 203,
-          categories: ['Épicerie', 'Premium'],
-          color: '#8b5cf6'
-        },
-        {
-          id: 6,
-          name: 'Viandes de Qualité',
-          email: 'contact@viandesqualite.com',
-          phone: '05 67 89 01 23',
-          location: 'Limousin, France',
-          status: 'active',
-          rating: 5,
-          totalOrders: 134,
-          categories: ['Viande', 'Bio'],
-          color: '#ec4899'
-        }
-      ]
+      suppliers: [],
+      loading: false,
+      error: null,
+      showModal: false,
+      showDetailsModal: false,
+      isEditMode: false,
+      submitting: false,
+      selectedSupplier: null,
+      supplierProducts: [],
+      supplierCommandes: [],
+      formData: {
+        nom: '',
+        contact: '',
+        adresse: '',
+        delais_livraison_jours: ''
+      }
     }
+  },
+  mounted() {
+    this.loadSuppliers();
   },
   computed: {
     filteredSuppliers() {
       return this.suppliers.filter(supplier => {
-        const matchesSearch = supplier.name.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                             supplier.email.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-                             supplier.location.toLowerCase().includes(this.searchQuery.toLowerCase())
-        const matchesStatus = !this.filterStatus || supplier.status === this.filterStatus
-        return matchesSearch && matchesStatus
+        const matchesSearch = supplier.nom.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                             supplier.contact.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                             supplier.adresse.toLowerCase().includes(this.searchQuery.toLowerCase())
+        return matchesSearch
       })
     },
     sortedSuppliers() {
@@ -335,40 +445,185 @@ export default {
       return filtered.sort((a, b) => {
         switch(this.sortBy) {
           case 'orders':
-            return b.totalOrders - a.totalOrders
-          case 'rating':
-            return b.rating - a.rating
+            return (b.commandes_count || 0) - (a.commandes_count || 0)
+          case 'delay':
+            return a.delais_livraison_jours - b.delais_livraison_jours
           default:
-            return a.name.localeCompare(b.name)
+            return a.nom.localeCompare(b.nom)
         }
       })
     },
-    activeSuppliers() {
-      return this.suppliers.filter(s => s.status === 'active').length
-    },
-    inactiveSuppliers() {
-      return this.suppliers.filter(s => s.status === 'inactive').length
+    totalProduits() {
+      return this.suppliers.reduce((sum, s) => sum + (s.produits_count || 0), 0)
     },
     totalOrders() {
-      return this.suppliers.reduce((sum, s) => sum + s.totalOrders, 0)
+      return this.suppliers.reduce((sum, s) => sum + (s.commandes_count || 0), 0)
+    },
+    averageDelay() {
+      if (this.suppliers.length === 0) return 0
+      const total = this.suppliers.reduce((sum, s) => sum + s.delais_livraison_jours, 0)
+      return Math.round(total / this.suppliers.length)
     }
   },
   methods: {
+    async loadSuppliers() {
+      this.loading = true;
+      this.error = null;
+      try {
+        const response = await fournisseursAPI.getAllFournisseurs();
+        this.suppliers = response.data;
+        
+        // Charger les produits et commandes pour chaque fournisseur
+        await this.loadSuppliersData();
+      } catch (error) {
+        console.error('Erreur lors du chargement des fournisseurs:', error);
+        this.error = 'Impossible de charger les fournisseurs. Veuillez réessayer.';
+        this.suppliers = [];
+      } finally {
+        this.loading = false;
+      }
+    },
+    async loadSuppliersData() {
+      try {
+        // Charger tous les produits
+        const produitsResponse = await produitsAPI.getAllProduits();
+        const produits = produitsResponse.data;
+        
+        // Charger toutes les commandes
+        const commandesResponse = await commandesAPI.getAllCommandes();
+        const commandes = commandesResponse.data;
+        
+        // Compter les produits et commandes par fournisseur
+        this.suppliers = this.suppliers.map(supplier => {
+          const supplierProduits = produits.filter(p => p.fournisseur === supplier.id_fournisseur);
+          const supplierCommandes = commandes.filter(c => c.fournisseur === supplier.id_fournisseur);
+          
+          // Extraire les catégories uniques des produits du fournisseur
+          const categories = [...new Set(supplierProduits.map(p => p.categorie_nom))];
+          
+          return {
+            ...supplier,
+            produits_count: supplierProduits.length,
+            commandes_count: supplierCommandes.length,
+            categories_produits: categories
+          };
+        });
+      } catch (error) {
+        console.error('Erreur lors du chargement des données supplémentaires:', error);
+      }
+    },
     getInitials(name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     },
-    showAddModal() {
-      console.log('Ouvrir modal d\'ajout fournisseur')
+    getSupplierColor(name) {
+      const colors = [
+        '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', 
+        '#ec4899', '#06b6d4', '#84cc16', '#f97316', '#6366f1'
+      ];
+      const index = name.length % colors.length;
+      return colors[index];
     },
-    editSupplier(supplier) {
-      console.log('Modifier fournisseur:', supplier.name)
+    showAddModal() {
+      this.isEditMode = false;
+      this.resetForm();
+      this.showModal = true;
+    },
+    async editSupplier(supplier) {
+      this.isEditMode = true;
+      this.selectedSupplier = supplier;
+      this.formData = {
+        nom: supplier.nom,
+        contact: supplier.contact,
+        adresse: supplier.adresse,
+        delais_livraison_jours: supplier.delais_livraison_jours
+      };
+      this.showModal = true;
     },
     contactSupplier(supplier) {
-      console.log('Contacter fournisseur:', supplier.name)
-      window.location.href = `mailto:${supplier.email}`
+      console.log('Contacter fournisseur:', supplier.nom);
+      alert(`Contacter ${supplier.nom} au ${supplier.contact}`);
     },
-    viewSupplier(supplier) {
-      console.log('Voir détails fournisseur:', supplier.name)
+    async viewSupplier(supplier) {
+      this.selectedSupplier = supplier;
+      
+      // Charger les produits et commandes du fournisseur
+      try {
+        const produitsResponse = await fournisseursAPI.getFournisseurProduits(supplier.id_fournisseur);
+        this.supplierProducts = produitsResponse.data;
+      } catch (error) {
+        console.error('Erreur lors du chargement des produits:', error);
+        this.supplierProducts = [];
+      }
+      
+      this.showDetailsModal = true;
+    },
+    async deleteSupplier(supplier) {
+      if (confirm(`Êtes-vous sûr de vouloir supprimer "${supplier.nom}" ?\n\nAttention: Cette action supprimera également tous les produits associés à ce fournisseur.`)) {
+        try {
+          await fournisseursAPI.deleteFournisseur(supplier.id_fournisseur);
+          this.showNotification('success', `Le fournisseur "${supplier.nom}" a été supprimé avec succès.`);
+          await this.loadSuppliers();
+        } catch (error) {
+          console.error('Erreur lors de la suppression:', error);
+          this.showNotification('error', 'Impossible de supprimer le fournisseur. Veuillez réessayer.');
+        }
+      }
+    },
+    closeModal() {
+      this.showModal = false;
+      this.resetForm();
+    },
+    closeDetailsModal() {
+      this.showDetailsModal = false;
+      this.selectedSupplier = null;
+      this.supplierProducts = [];
+    },
+    resetForm() {
+      this.formData = {
+        nom: '',
+        contact: '',
+        adresse: '',
+        delais_livraison_jours: ''
+      };
+      this.selectedSupplier = null;
+    },
+    async submitSupplier() {
+      this.submitting = true;
+      try {
+        if (this.isEditMode) {
+          await fournisseursAPI.updateFournisseur(this.selectedSupplier.id_fournisseur, this.formData);
+          this.showNotification('success', `Le fournisseur "${this.formData.nom}" a été mis à jour avec succès.`);
+        } else {
+          await fournisseursAPI.createFournisseur(this.formData);
+          this.showNotification('success', `Le fournisseur "${this.formData.nom}" a été ajouté avec succès.`);
+        }
+        this.closeModal();
+        await this.loadSuppliers();
+      } catch (error) {
+        console.error('Erreur lors de la soumission:', error);
+        const message = this.isEditMode 
+          ? 'Impossible de mettre à jour le fournisseur.' 
+          : 'Impossible d\'ajouter le fournisseur.';
+        this.showNotification('error', message);
+      } finally {
+        this.submitting = false;
+      }
+    },
+    editFromDetails() {
+      this.closeDetailsModal();
+      this.editSupplier(this.selectedSupplier);
+    },
+    async deleteFromDetails() {
+      const supplier = this.selectedSupplier;
+      this.closeDetailsModal();
+      await this.deleteSupplier(supplier);
+    },
+    showNotification(type, message) {
+      if (type === 'error') {
+        alert('❌ ' + message);
+      } else {
+        alert('✅ ' + message);
+      }
     }
   }
 }
@@ -805,6 +1060,21 @@ export default {
   stroke: #d97706;
 }
 
+.action-btn.delete {
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.action-btn.delete:hover {
+  background: #fecaca;
+  border-color: #fca5a5;
+  color: #dc2626;
+}
+
+.action-btn.delete:hover svg {
+  stroke: #dc2626;
+}
+
 /* List View */
 .suppliers-grid.list .supplier-card {
   display: flex;
@@ -929,6 +1199,427 @@ export default {
   .suppliers-grid.list .tags {
     margin-bottom: 1.25rem;
   }
+}
+
+/* ==================== LOADING & ERROR STATES ==================== */
+.loading-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  margin: 0 auto 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-state p {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.error-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 12px;
+  border: 2px solid #fee2e2;
+}
+
+.error-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.7;
+}
+
+.error-state h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #ef4444;
+  margin-bottom: 8px;
+}
+
+.error-state p {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 24px;
+}
+
+/* ==================== MODAL STYLES ==================== */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.close-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: #f3f4f6;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.modal-body {
+  padding: 24px;
+  max-height: calc(90vh - 180px);
+  overflow-y: auto;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.form-group input,
+.form-group textarea {
+  padding: 12px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 14px;
+  color: #111827;
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+  outline: none;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-cancel,
+.btn-submit {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.btn-cancel:hover {
+  background: #e5e7eb;
+}
+
+.btn-submit {
+  background: #4f46e5;
+  color: white;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: #4338ca;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ==================== DETAILS MODAL ==================== */
+.details-modal {
+  max-width: 700px;
+}
+
+.details-body {
+  padding: 24px;
+}
+
+.supplier-header-detail {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.avatar-large {
+  width: 80px;
+  height: 80px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+}
+
+.supplier-header-detail h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 4px 0;
+}
+
+.supplier-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  margin: 0;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.detail-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.categories-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.category-badge {
+  padding: 6px 12px;
+  background: #f3f4f6;
+  color: #374151;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.products-section {
+  margin-bottom: 24px;
+  padding: 20px;
+  background: #f9fafb;
+  border-radius: 12px;
+}
+
+.products-section h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+.products-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.product-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+.product-name {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.product-price {
+  font-size: 14px;
+  color: #10b981;
+  font-weight: 600;
+}
+
+.more-products {
+  font-size: 13px;
+  color: #6b7280;
+  text-align: center;
+  margin: 8px 0 0 0;
+  font-style: italic;
+}
+
+.details-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 24px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-edit,
+.btn-delete {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-edit {
+  background: #4f46e5;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #4338ca;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+}
+
+.btn-delete {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.btn-delete:hover {
+  background: #ef4444;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 @media (max-width: 480px) {

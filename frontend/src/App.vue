@@ -25,14 +25,17 @@
 
       <!-- User section -->
       <div class="user-section">
-        <div class="user-profile">
-          <div class="user-avatar">DE</div>
+
+        <button class="logout-btn" @click="handleProfile">
+          <img :src="logoutIcon" alt="Déconnexion" class="nav-icon-img" />
           <span class="user-name">Déric EZIN</span>
-        </div>
+        </button>
+
         <button class="logout-btn" @click="handleLogout">
           <img :src="logoutIcon" alt="Déconnexion" class="nav-icon-img" />
           <span>Déconnexion</span>
         </button>
+
       </div>
     </aside>
 
@@ -181,6 +184,10 @@ export default {
     
     handleLogout() {
       console.log('Déconnexion')
+    },
+
+    handleProfile() {
+      
     },
     
     handleRefresh() {
