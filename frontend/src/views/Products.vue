@@ -419,9 +419,14 @@
 import produitsAPI from '../services/produits';
 import categoriesAPI from '../services/categories';
 import fournisseursAPI from '../services/fournisseurs';
+import { useDataCache } from '@/composables/useDataCache';
 
 export default {
   name: 'ProductsView',
+  setup() {
+    const { loadWithCache, invalidateCache } = useDataCache();
+    return { loadWithCache, invalidateCache };
+  },
   data() {
     return {
       searchQuery: '',
@@ -453,9 +458,10 @@ export default {
     }
   },
   mounted() {
-    this.loadProducts();
-    this.loadCategories();
-    this.loadFournisseurs();
+    // Charger avec cache si disponible
+    this.loadProducts(false);
+    this.loadCategories(false);
+    this.loadFournisseurs(false);
   },
   computed: {
     filteredProducts() {
@@ -496,32 +502,63 @@ export default {
     }
   },
   methods: {
-    async loadProducts() {
-      this.loading = true;
+    // === MÉTHODE PUBLIQUE POUR REFRESH DEPUIS APP.VUE ===
+    async refreshData() {
+      console.log('🔄 Rafraîchissement forcé des Produits...');
+      this.invalidateCache('produits');
+      this.invalidateCache('categories');
+      this.invalidateCache('fournisseurs');
+      await Promise.all([
+        this.loadProducts(true),
+        this.loadCategories(true),
+        this.loadFournisseurs(true)
+      ]);
+      this.showNotification('success', '✅ Données actualisées');
+    },
+    
+    async loadProducts(forceRefresh = false) {
+      // Ne montrer le loading QUE si on force le refresh ou si pas de données
+      const showLoading = forceRefresh || !this.products.length;
+      
+      if (showLoading) {
+        this.loading = true;
+      }
       this.error = null;
+      
       try {
-        const response = await produitsAPI.getAllProduits();
-        this.products = response.data;
+        this.products = await this.loadWithCache('produits', async () => {
+          const response = await produitsAPI.getAllProduits();
+          console.log('📦 Produits chargés depuis l\'API:', response.data.length);
+          return response.data;
+        }, forceRefresh);
       } catch (error) {
         console.error('Erreur lors du chargement des produits:', error);
         this.error = 'Impossible de charger les produits. Veuillez réessayer.';
         this.products = [];
       } finally {
-        this.loading = false;
+        if (showLoading) {
+          this.loading = false;
+        }
       }
     },
-    async loadCategories() {
+    async loadCategories(forceRefresh = false) {
       try {
-        const response = await categoriesAPI.getAllCategories();
-        this.categoriesList = response.data;
+        this.categoriesList = await this.loadWithCache('categories', async () => {
+          const response = await categoriesAPI.getAllCategories();
+          console.log('📦 Catégories chargées depuis l\'API:', response.data.length);
+          return response.data;
+        }, forceRefresh);
       } catch (error) {
         console.error('Erreur lors du chargement des catégories:', error);
       }
     },
-    async loadFournisseurs() {
+    async loadFournisseurs(forceRefresh = false) {
       try {
-        const response = await fournisseursAPI.getAllFournisseurs();
-        this.fournisseursList = response.data;
+        this.fournisseursList = await this.loadWithCache('fournisseurs', async () => {
+          const response = await fournisseursAPI.getAllFournisseurs();
+          console.log('📦 Fournisseurs chargés depuis l\'API:', response.data.length);
+          return response.data;
+        }, forceRefresh);
       } catch (error) {
         console.error('Erreur lors du chargement des fournisseurs:', error);
       }
@@ -588,7 +625,10 @@ export default {
           this.showNotification('success', `Le produit "${this.formData.nom}" a été ajouté avec succès.`);
         }
         this.closeModal();
-        await this.loadProducts();
+        
+        // Invalider le cache et recharger
+        this.invalidateCache('produits');
+        await this.loadProducts(true);
       } catch (error) {
         console.error('Erreur lors de la soumission:', error);
         const message = this.isEditMode 
@@ -604,7 +644,10 @@ export default {
         try {
           await produitsAPI.deleteProduit(product.id_product);
           this.showNotification('success', `Le produit "${product.nom}" a été supprimé avec succès.`);
-          await this.loadProducts();
+          
+          // Invalider le cache et recharger
+          this.invalidateCache('produits');
+          await this.loadProducts(true);
         } catch (error) {
           console.error('Erreur lors de la suppression:', error);
           this.showNotification('error', 'Impossible de supprimer le produit. Veuillez réessayer.');

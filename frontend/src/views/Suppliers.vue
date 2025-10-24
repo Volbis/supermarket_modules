@@ -402,9 +402,14 @@
 import fournisseursAPI from '../services/fournisseurs';
 import produitsAPI from '../services/produits';
 import commandesAPI from '../services/commandes';
+import { useDataCache } from '@/composables/useDataCache';
 
 export default {
   name: 'FournisseursView',
+  setup() {
+    const { loadWithCache, invalidateCache } = useDataCache();
+    return { loadWithCache, invalidateCache };
+  },
   data() {
     return {
       searchQuery: '',
@@ -429,7 +434,8 @@ export default {
     }
   },
   mounted() {
-    this.loadSuppliers();
+    // Charger avec cache si disponible
+    this.loadSuppliers(false);
   },
   computed: {
     filteredSuppliers() {
@@ -466,32 +472,59 @@ export default {
     }
   },
   methods: {
-    async loadSuppliers() {
-      this.loading = true;
+    // === MÉTHODE PUBLIQUE POUR REFRESH DEPUIS APP.VUE ===
+    async refreshData() {
+      console.log('🔄 Rafraîchissement forcé des Fournisseurs...');
+      this.invalidateCache('fournisseurs');
+      this.invalidateCache('produits');
+      this.invalidateCache('commandes');
+      await this.loadSuppliers(true);
+      this.showNotification('success', '✅ Fournisseurs actualisés');
+    },
+    
+    async loadSuppliers(forceRefresh = false) {
+      // Ne montrer le loading QUE si on force le refresh ou si pas de données
+      const showLoading = forceRefresh || !this.suppliers.length;
+      
+      if (showLoading) {
+        this.loading = true;
+      }
       this.error = null;
+      
       try {
-        const response = await fournisseursAPI.getAllFournisseurs();
-        this.suppliers = response.data;
+        this.suppliers = await this.loadWithCache('fournisseurs', async () => {
+          const response = await fournisseursAPI.getAllFournisseurs();
+          console.log('📦 Fournisseurs chargés depuis l\'API:', response.data.length);
+          return response.data;
+        }, forceRefresh);
         
         // Charger les produits et commandes pour chaque fournisseur
-        await this.loadSuppliersData();
+        await this.loadSuppliersData(forceRefresh);
       } catch (error) {
         console.error('Erreur lors du chargement des fournisseurs:', error);
         this.error = 'Impossible de charger les fournisseurs. Veuillez réessayer.';
         this.suppliers = [];
       } finally {
-        this.loading = false;
+        if (showLoading) {
+          this.loading = false;
+        }
       }
     },
-    async loadSuppliersData() {
+    async loadSuppliersData(forceRefresh = false) {
       try {
-        // Charger tous les produits
-        const produitsResponse = await produitsAPI.getAllProduits();
-        const produits = produitsResponse.data;
+        // Charger tous les produits avec cache
+        const produits = await this.loadWithCache('produits', async () => {
+          const response = await produitsAPI.getAllProduits();
+          console.log('📦 Produits chargés pour fournisseurs:', response.data.length);
+          return response.data;
+        }, forceRefresh);
         
-        // Charger toutes les commandes
-        const commandesResponse = await commandesAPI.getAllCommandes();
-        const commandes = commandesResponse.data;
+        // Charger toutes les commandes avec cache
+        const commandes = await this.loadWithCache('commandes', async () => {
+          const response = await commandesAPI.getAllCommandes();
+          console.log('📦 Commandes chargées pour fournisseurs:', response.data.length);
+          return response.data;
+        }, forceRefresh);
         
         // Compter les produits et commandes par fournisseur
         this.suppliers = this.suppliers.map(supplier => {
@@ -562,7 +595,10 @@ export default {
         try {
           await fournisseursAPI.deleteFournisseur(supplier.id_fournisseur);
           this.showNotification('success', `Le fournisseur "${supplier.nom}" a été supprimé avec succès.`);
-          await this.loadSuppliers();
+          
+          // Invalider le cache et recharger
+          this.invalidateCache('fournisseurs');
+          await this.loadSuppliers(true);
         } catch (error) {
           console.error('Erreur lors de la suppression:', error);
           this.showNotification('error', 'Impossible de supprimer le fournisseur. Veuillez réessayer.');
@@ -598,7 +634,10 @@ export default {
           this.showNotification('success', `Le fournisseur "${this.formData.nom}" a été ajouté avec succès.`);
         }
         this.closeModal();
-        await this.loadSuppliers();
+        
+        // Invalider le cache et recharger
+        this.invalidateCache('fournisseurs');
+        await this.loadSuppliers(true);
       } catch (error) {
         console.error('Erreur lors de la soumission:', error);
         const message = this.isEditMode 

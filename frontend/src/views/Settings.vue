@@ -217,6 +217,11 @@ export default {
     }
   },
   methods: {
+    // === MÉTHODE PUBLIQUE POUR REFRESH DEPUIS APP.VUE ===
+    refreshData() {
+      console.log('ℹ️ Settings n\'a pas besoin de refresh (page statique)');
+    },
+    
     saveProfile() {
       console.log('Profil sauvegardé', this.userProfile)
       alert('Profil mis à jour avec succès !')

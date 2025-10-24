@@ -57,7 +57,7 @@
 
       <!-- Contenu dynamique -->
       <div class="page-content">
-        <component :is="currentComponent" />
+        <component :is="currentComponent" :key="componentKey" ref="currentPage" />
       </div>
     </main>
 
@@ -112,6 +112,9 @@ export default {
       
       // Modal de déconnexion
       showLogoutModal: false,
+      
+      // Key pour forcer le re-render si nécessaire
+      componentKey: 0,
       
       // Page actuelle
       currentPage: {
@@ -238,7 +241,16 @@ export default {
     },
     
     handleRefresh() {
-      console.log('Actualisation')
+      console.log('🔄 Actualisation forcée demandée')
+      
+      // Appeler la méthode refresh du composant actif s'il en a une
+      const currentPageComponent = this.$refs.currentPage
+      
+      if (currentPageComponent && typeof currentPageComponent.refreshData === 'function') {
+        currentPageComponent.refreshData()
+      } else {
+        console.warn('⚠️ Le composant actuel n\'a pas de méthode refreshData()')
+      }
     }
   }
 }

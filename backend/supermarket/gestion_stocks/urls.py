@@ -42,6 +42,10 @@ router.register(r'historique-ventes', HistoriqueVenteViewSet, basename='historiq
 # Intégration des URLs du routeur
 urlpatterns = [
     path('', include(router.urls)),
+    # Route personnalisée pour par-periode sans le suffixe /list/
+    path('historique-ventes/par-periode/', 
+         HistoriqueVenteViewSet.as_view({'get': 'par_periode'}),
+         name='historique-vente-par-periode'),
 ]
 # ============================================================================
 # Pattern URLs

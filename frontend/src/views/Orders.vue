@@ -2,7 +2,7 @@
   <div class="orders-page">
     <!-- Cartes de statistiques -->
         <!-- Stats Cards -->
-    <div class="stats-grid">
+    <div class="stats-container">
       <div class="stat-card">
         <div class="stat-icon" style="background: #e3f2fd">
           <i class="fas fa-shopping-cart" style="color: #1976d2"></i>
@@ -231,9 +231,14 @@
 
 <script>
 import { commandesAPI, produitsAPI, fournisseursAPI, detailsCommandesAPI } from '@/services';
+import { useDataCache } from '@/composables/useDataCache';
 
 export default {
   name: 'OrdersManagementPage',
+  setup() {
+    const { loadWithCache, invalidateCache } = useDataCache();
+    return { loadWithCache, invalidateCache };
+  },
   data() {
     return {
       searchQuery: '',
@@ -269,7 +274,8 @@ export default {
     };
   },
   mounted() {
-    this.loadData();
+    // Charger avec cache si disponible
+    this.loadData(false);
   },
   computed: {
     filteredCommandes() {
@@ -283,26 +289,53 @@ export default {
     }
   },
   methods: {
+    // === MÉTHODE PUBLIQUE POUR REFRESH DEPUIS APP.VUE ===
+    async refreshData() {
+      console.log('🔄 Rafraîchissement forcé des Commandes...');
+      this.invalidateCache('commandes');
+      this.invalidateCache('produits');
+      this.invalidateCache('fournisseurs');
+      await this.loadData(true);
+      alert('✅ Commandes actualisées');
+    },
+    
     /**
      * Charge toutes les données depuis l'API
      */
-    async loadData() {
-      this.loading = true;
+    async loadData(forceRefresh = false) {
+      // Ne montrer le loading QUE si on force le refresh (pas de cache disponible)
+      const showLoading = forceRefresh || !this.commandes.length;
+      
+      if (showLoading) {
+        this.loading = true;
+      }
       this.error = null;
       
       try {
-        // Charger toutes les données en parallèle
-        const [commandesRes, produitsRes, fournisseursRes, detailsRes] = await Promise.all([
-          commandesAPI.getAllCommandes(),
-          produitsAPI.getAllProduits(),
-          fournisseursAPI.getAllFournisseurs(),
-          detailsCommandesAPI.getAllDetailsCommandes()
+        // Charger toutes les données en parallèle avec cache
+        const [commandesData, produitsData, fournisseursData, detailsData] = await Promise.all([
+          this.loadWithCache('commandes', async () => {
+            const res = await commandesAPI.getAllCommandes();
+            console.log('📦 Commandes chargées depuis l\'API:', res.data.length);
+            return res.data;
+          }, forceRefresh),
+          this.loadWithCache('produits', async () => {
+            const res = await produitsAPI.getAllProduits();
+            console.log('📦 Produits chargés depuis l\'API:', res.data.length);
+            return res.data;
+          }, forceRefresh),
+          this.loadWithCache('fournisseurs', async () => {
+            const res = await fournisseursAPI.getAllFournisseurs();
+            console.log('📦 Fournisseurs chargés depuis l\'API:', res.data.length);
+            return res.data;
+          }, forceRefresh),
+          detailsCommandesAPI.getAllDetailsCommandes().then(res => res.data)
         ]);
         
-        this.commandes = commandesRes.data;
-        this.produits = produitsRes.data;
-        this.fournisseurs = fournisseursRes.data;
-        this.details = detailsRes.data;
+        this.commandes = commandesData;
+        this.produits = produitsData;
+        this.fournisseurs = fournisseursData;
+        this.details = detailsData;
         
         // Calculer les statistiques
         this.calculateStats();
@@ -319,7 +352,9 @@ export default {
         console.error('Erreur:', err);
         alert('Erreur lors du chargement des commandes');
       } finally {
-        this.loading = false;
+        if (showLoading) {
+          this.loading = false;
+        }
       }
     },
     
@@ -481,8 +516,9 @@ export default {
         
         console.log('Détails de commande créés');
         
-        // 3. Recharger les données
-        await this.loadData();
+        // 3. Invalider le cache et recharger les données
+        this.invalidateCache('commandes');
+        await this.loadData(true);
         
         // 4. Fermer le modal
         this.closeModal();
@@ -579,7 +615,11 @@ export default {
       
       try {
         await commandesAPI.deleteCommande(commande.id_commande);
-        await this.loadData();
+        
+        // Invalider le cache et recharger
+        this.invalidateCache('commandes');
+        await this.loadData(true);
+        
         alert('Commande supprimée avec succès !');
       } catch (err) {
         console.error('Erreur:', err);

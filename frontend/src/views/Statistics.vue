@@ -3,16 +3,62 @@
     <!-- En-tête avec filtres -->
     <div class="page-header">
       <div class="filters-container">
-        <select v-model="dateFilter" @change="loadStatistics" class="filter-select">
-          <option value="7">7 derniers jours</option>
-          <option value="30">30 derniers jours</option>
-          <option value="90">90 derniers jours</option>
-          <option value="365">1 an</option>
-        </select>
+        <div class="filter-group">
+          <label class="filter-label">📅 Période</label>
+          <select v-model="dateFilter" @change="applyFilters" class="filter-select">
+            <option value="7">7 derniers jours</option>
+            <option value="30">30 derniers jours</option>
+            <option value="90">90 derniers jours</option>
+            <option value="180">6 mois</option>
+            <option value="365">1 an</option>
+            <option value="all">Tout</option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label class="filter-label">📦 Produit</label>
+          <select v-model="productFilter" @change="applyFilters" class="filter-select">
+            <option value="all">Tous les produits</option>
+            <option v-for="product in availableProducts" :key="product" :value="product">
+              {{ product }}
+            </option>
+          </select>
+        </div>
+        
+        <div class="filter-group">
+          <label class="filter-label">💰 Montant</label>
+          <select v-model="amountFilter" @change="applyFilters" class="filter-select">
+            <option value="all">Tous montants</option>
+            <option value="low">Moins de 10 000 XOF</option>
+            <option value="medium">10 000 - 50 000 XOF</option>
+            <option value="high">Plus de 50 000 XOF</option>
+          </select>
+        </div>
+        
+        <button class="reset-btn" @click="resetFilters" title="Réinitialiser les filtres">
+          🔄 Réinitialiser
+        </button>
         
         <button class="export-btn" @click="exportData">
           📥 Exporter
         </button>
+      </div>
+      
+      <!-- Indicateurs de filtres actifs -->
+      <div v-if="hasActiveFilters" class="active-filters">
+        <span class="filter-badge">Filtres actifs:</span>
+        <span v-if="dateFilter !== '30'" class="filter-tag">
+          📅 {{ getDateFilterLabel() }}
+          <button @click="dateFilter = '30'; applyFilters()" class="remove-filter">×</button>
+        </span>
+        <span v-if="productFilter !== 'all'" class="filter-tag">
+          📦 {{ productFilter }}
+          <button @click="productFilter = 'all'; applyFilters()" class="remove-filter">×</button>
+        </span>
+        <span v-if="amountFilter !== 'all'" class="filter-tag">
+          💰 {{ getAmountFilterLabel() }}
+          <button @click="amountFilter = 'all'; applyFilters()" class="remove-filter">×</button>
+        </span>
       </div>
     </div>
 
@@ -189,18 +235,27 @@
 import Chart from 'chart.js/auto';
 import historiqueVentesAPI from '@/services/historiqueVentes';
 import historiqueStockAPI from '@/services/historiqueStock';
+import { useDataCache } from '@/composables/useDataCache';
 
 export default {
   name: 'StatisticsView',
+  setup() {
+    const { loadWithCache, invalidateCache } = useDataCache();
+    return { loadWithCache, invalidateCache };
+  },
   data() {
     return {
       loading: true,
       error: null,
       dateFilter: '30',
+      productFilter: 'all',
+      amountFilter: 'all',
       
       // Données brutes de l'API
       ventesData: [],
+      ventesDataRaw: [], // Données non filtrées
       stockData: [],
+      availableProducts: [], // Liste des produits disponibles
       
       // Données KPI
       filteredOrdersCount: 0,
@@ -245,11 +300,18 @@ export default {
         { label: 'Commandes/jour', value: this.ordersPerDay.toFixed(1) },
         { label: 'Taux conversion', value: `${this.conversionRate}%` }
       ];
+    },
+    
+    hasActiveFilters() {
+      return this.dateFilter !== '30' || 
+             this.productFilter !== 'all' || 
+             this.amountFilter !== 'all';
     }
   },
   
   mounted() {
-    this.loadStatistics();
+    // Charger avec cache si disponible
+    this.loadStatistics(false);
   },
   
   beforeUnmount() {
@@ -257,27 +319,49 @@ export default {
   },
   
   methods: {
-    async loadStatistics() {
-      this.loading = true;
+    // === MÉTHODE PUBLIQUE POUR REFRESH DEPUIS APP.VUE ===
+    async refreshData() {
+      console.log('🔄 Rafraîchissement forcé des Statistiques...');
+      this.invalidateCache('ventes');
+      this.invalidateCache('stocks');
+      await this.loadStatistics(true);
+      if (this.$toast) {
+        this.$toast.success('✅ Statistiques actualisées');
+      }
+    },
+    
+    async loadStatistics(forceRefresh = false) {
+      // Ne montrer le loading QUE si on force le refresh ou si pas de données
+      const showLoading = forceRefresh || !this.ventesDataRaw.length;
+      
+      if (showLoading) {
+        this.loading = true;
+      }
       this.error = null;
       
       try {
         // Calculer les dates selon le filtre
         const { dateDebut } = this.calculateDateRange();
         
-        // Charger les données de ventes
-        //const ventesResponse = await historiqueVentesAPI.getVentesByPeriode(dateDebut, dateFin);
-        const ventesResponse = await historiqueVentesAPI.getAllHistoriqueVentes();
-
-        console.log('Réponse API ventes:', ventesResponse);
+        // Charger les données de ventes avec cache
+        this.ventesDataRaw = await this.loadWithCache('ventes', async () => {
+          const ventesResponse = await historiqueVentesAPI.getAllHistoriqueVentes();
+          console.log('📦 Ventes chargées depuis l\'API:', ventesResponse.data);
+          return ventesResponse.data?.ventes || ventesResponse.data || [];
+        }, forceRefresh);
         
-        // Adapter selon la structure de votre API
-        this.ventesData = ventesResponse.data?.ventes || ventesResponse.data || [];
+        // Extraire les produits disponibles
+        this.extractAvailableProducts();
         
-        // Charger les données d'historique stock
-        const stockResponse = await historiqueStockAPI.getAllHistoriqueStock();
-        console.log('Réponse API stock:', stockResponse);
-        this.stockData = stockResponse.data || [];
+        // Appliquer les filtres
+        this.applyFilters();
+        
+        // Charger les données d'historique stock avec cache
+        this.stockData = await this.loadWithCache('stocks', async () => {
+          const stockResponse = await historiqueStockAPI.getAllHistoriqueStock();
+          console.log('📦 Stocks chargés depuis l\'API:', stockResponse.data);
+          return stockResponse.data || [];
+        }, forceRefresh);
         
         // Charger aussi la période précédente pour calculer la croissance
         await this.loadPreviousPeriodData(dateDebut);
@@ -309,7 +393,9 @@ export default {
           this.$toast.error('Erreur lors du chargement des statistiques');
         }
       } finally {
-        this.loading = false;
+        if (showLoading) {
+          this.loading = false;
+        }
       }
     },
     
@@ -825,6 +911,115 @@ export default {
       const rows = data.map(row => Object.values(row).map(val => `"${val}"`).join(','));
       
       return [headers, ...rows].join('\n');
+    },
+    
+    // === MÉTHODES DE FILTRAGE ===
+    
+    extractAvailableProducts() {
+      const productsSet = new Set();
+      this.ventesDataRaw.forEach(vente => {
+        const produitNom = vente.produit_nom || 'Produit inconnu';
+        productsSet.add(produitNom);
+      });
+      this.availableProducts = Array.from(productsSet).sort();
+    },
+    
+    applyFilters() {
+      console.log('Application des filtres...', {
+        date: this.dateFilter,
+        product: this.productFilter,
+        amount: this.amountFilter
+      });
+      
+      let filteredData = [...this.ventesDataRaw];
+      
+      // Filtre par période
+      if (this.dateFilter !== 'all') {
+        const days = parseInt(this.dateFilter);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        
+        filteredData = filteredData.filter(vente => {
+          const venteDate = new Date(vente.date_vente);
+          return venteDate >= cutoffDate;
+        });
+      }
+      
+      // Filtre par produit
+      if (this.productFilter !== 'all') {
+        filteredData = filteredData.filter(vente => {
+          return vente.produit_nom === this.productFilter;
+        });
+      }
+      
+      // Filtre par montant
+      if (this.amountFilter !== 'all') {
+        filteredData = filteredData.filter(vente => {
+          const montant = parseFloat(vente.montant_total || 0);
+          
+          switch(this.amountFilter) {
+            case 'low':
+              return montant < 10000;
+            case 'medium':
+              return montant >= 10000 && montant <= 50000;
+            case 'high':
+              return montant > 50000;
+            default:
+              return true;
+          }
+        });
+      }
+      
+      this.ventesData = filteredData;
+      
+      console.log(`Résultats filtrés: ${filteredData.length} sur ${this.ventesDataRaw.length}`);
+      
+      // Recalculer les statistiques
+      this.calculateKPIs();
+      this.calculateTopProducts();
+      this.calculateOrderStatuses();
+      
+      // Recharger les fournisseurs (données simulées)
+      this.loadSuppliersData();
+      
+      // Mettre à jour les graphiques
+      this.$nextTick(() => {
+        this.destroyCharts();
+        
+        setTimeout(() => {
+          console.log('Mise à jour des graphiques avec filtres...');
+          this.initCharts();
+        }, 100);
+      });
+    },
+    
+    resetFilters() {
+      console.log('Réinitialisation des filtres');
+      this.dateFilter = '30';
+      this.productFilter = 'all';
+      this.amountFilter = 'all';
+      this.applyFilters();
+    },
+    
+    getDateFilterLabel() {
+      const labels = {
+        '7': '7 jours',
+        '30': '30 jours',
+        '90': '90 jours',
+        '180': '6 mois',
+        '365': '1 an',
+        'all': 'Tout'
+      };
+      return labels[this.dateFilter] || this.dateFilter;
+    },
+    
+    getAmountFilterLabel() {
+      const labels = {
+        'low': 'Moins de 10K',
+        'medium': '10K - 50K',
+        'high': 'Plus de 50K'
+      };
+      return labels[this.amountFilter] || 'Tous montants';
     }
   }
 };
@@ -921,11 +1116,26 @@ export default {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: flex-end;
   background: white;
-  padding: 16px;
+  padding: 20px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   border: 1px solid #e5e7eb;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .filter-select {
@@ -964,6 +1174,79 @@ export default {
 .export-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.reset-btn {
+  padding: 10px 20px;
+  background: white;
+  color: #64748b;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reset-btn:hover {
+  border-color: #3B82F6;
+  color: #3B82F6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Filtres actifs */
+.active-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #f8fafc;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-top: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+.filter-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.filter-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #3B82F6 0%, #2563eb 100%);
+  color: white;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.remove-filter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.3);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.remove-filter:hover {
+  background: rgba(255, 255, 255, 0.5);
+  transform: scale(1.1);
 }
 
 /* Grilles */
@@ -1328,16 +1611,31 @@ td {
   
   .filters-container {
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
+    align-items: stretch;
+  }
+  
+  .filter-group {
+    width: 100%;
   }
   
   .filter-select {
     width: 100%;
   }
   
+  .reset-btn,
   .export-btn {
     margin-left: 0;
     width: 100%;
+  }
+  
+  .active-filters {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .filter-tag {
+    font-size: 12px;
   }
   
   .cards-grid-top {

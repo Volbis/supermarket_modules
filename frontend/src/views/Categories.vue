@@ -151,9 +151,14 @@
 
 <script>
 import categoriesAPI from '../services/categories';
+import { useDataCache } from '@/composables/useDataCache';
 
 export default {
   name: 'CategoriesView',
+  setup() {
+    const { loadWithCache, invalidateCache } = useDataCache();
+    return { loadWithCache, invalidateCache };
+  },
   data() {
     return {
       categories: [],
@@ -173,24 +178,43 @@ export default {
     };
   },
   mounted() {
-    this.fetchCategories();
+    // Charger avec cache si disponible
+    this.fetchCategories(false);
   },
   methods: {
+    // === MÉTHODE PUBLIQUE POUR REFRESH DEPUIS APP.VUE ===
+    async refreshData() {
+      console.log('🔄 Rafraîchissement forcé des Catégories...');
+      this.invalidateCache('categories');
+      await this.fetchCategories(true);
+      alert('✅ Catégories actualisées');
+    },
+    
     /**
      * Récupère toutes les catégories depuis l'API
      */
-    async fetchCategories() {
-      this.loading = true;
+    async fetchCategories(forceRefresh = false) {
+      // Ne montrer le loading QUE si on force le refresh ou si pas de données
+      const showLoading = forceRefresh || !this.categories.length;
+      
+      if (showLoading) {
+        this.loading = true;
+      }
       this.error = null;
+      
       try {
-        const response = await categoriesAPI.getAllCategories();
-        this.categories = response.data;
-        console.log('Catégories chargées:', this.categories);
+        this.categories = await this.loadWithCache('categories', async () => {
+          const response = await categoriesAPI.getAllCategories();
+          console.log('📦 Catégories chargées depuis l\'API:', response.data);
+          return response.data;
+        }, forceRefresh);
       } catch (err) {
         this.error = err.response?.data?.message || 'Erreur lors du chargement des catégories';
         console.error('Erreur de chargement:', err);
       } finally {
-        this.loading = false;
+        if (showLoading) {
+          this.loading = false;
+        }
       }
     },
 
@@ -253,7 +277,10 @@ export default {
         }
         
         this.closeModal();
-        await this.fetchCategories();
+        
+        // Invalider le cache et recharger
+        this.invalidateCache('categories');
+        await this.fetchCategories(true);
         
         // Afficher un message de succès (vous pouvez utiliser une bibliothèque de notifications)
         alert(this.isEditing ? 'Catégorie mise à jour avec succès !' : 'Catégorie créée avec succès !');
@@ -285,7 +312,10 @@ export default {
         
         this.showDeleteModal = false;
         this.categoryToDelete = null;
-        await this.fetchCategories();
+        
+        // Invalider le cache et recharger
+        this.invalidateCache('categories');
+        await this.fetchCategories(true);
         
         alert('Catégorie supprimée avec succès !');
         

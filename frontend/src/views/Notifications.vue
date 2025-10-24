@@ -250,6 +250,12 @@ export default {
     }
   },
   methods: {
+    // === MÉTHODE PUBLIQUE POUR REFRESH DEPUIS APP.VUE ===
+    async refreshData() {
+      console.log('🔄 Rafraîchissement forcé des Notifications...');
+      await this.refreshNotifications();
+    },
+    
     async loadNotifications() {
       this.loading = true;
       this.error = null;
