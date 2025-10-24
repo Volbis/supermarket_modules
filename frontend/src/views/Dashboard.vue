@@ -1,21 +1,5 @@
 <template>
   <div class="dashboard-content">
-    <!-- En-tête du dashboard -->
-    <div class="dashboard-header">
-      <div class="header-left">
-        <h1 class="dashboard-title">Tableau de bord</h1>
-        <p class="dashboard-subtitle">Vue d'ensemble en temps réel</p>
-      </div>
-      <div class="header-right">
-        <div v-if="lastUpdate" class="last-update">
-          Dernière màj: {{ lastUpdate }}
-        </div>
-        <button @click="loadDashboardData(false, true)" class="refresh-btn" :disabled="loading">
-          <span class="refresh-icon" :class="{ spinning: loading }">🔄</span>
-          {{ loading ? 'Actualisation...' : 'Actualiser' }}
-        </button>
-      </div>
-    </div>
     
     <!-- Toast Notifications -->
     <transition-group name="toast" tag="div" class="toast-container">
@@ -56,6 +40,7 @@
         <div class="stat-content">
           <h3 class="stat-label">Ventes du jour</h3>
           <p class="stat-value">{{ formattedDailySales }}</p>
+          
           <span :class="['stat-change', salesTrend.direction]">
             <span class="arrow" v-if="salesTrend.direction === 'positive'">↑</span>
             <span class="arrow" v-else-if="salesTrend.direction === 'negative'">↓</span>

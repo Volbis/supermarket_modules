@@ -236,15 +236,15 @@ import { useDataCache } from '@/composables/useDataCache';
 export default {
   name: 'OrdersManagementPage',
   setup() {
-    const { loadWithCache, invalidateCache } = useDataCache();
-    return { loadWithCache, invalidateCache };
+    const { loadWithCache, invalidateCache, isCacheValid } = useDataCache();
+    return { loadWithCache, invalidateCache, isCacheValid };
   },
   data() {
     return {
       searchQuery: '',
       selectedStatus: '',
       showModal: false,
-      loading: false,
+      loading: true, // Commencer en loading pour éviter le flash "Aucune commande"
       error: null,
       
       // Données du backend
@@ -303,8 +303,13 @@ export default {
      * Charge toutes les données depuis l'API
      */
     async loadData(forceRefresh = false) {
-      // Ne montrer le loading QUE si on force le refresh (pas de cache disponible)
-      const showLoading = forceRefresh || !this.commandes.length;
+      // Ne montrer le loading QUE si:
+      // - On force le refresh OU
+      // - Le cache n'est pas valide (expiré ou inexistant)
+      const cacheDisponible = this.isCacheValid('commandes') && 
+                              this.isCacheValid('produits') && 
+                              this.isCacheValid('fournisseurs');
+      const showLoading = forceRefresh || !cacheDisponible;
       
       if (showLoading) {
         this.loading = true;
@@ -352,9 +357,8 @@ export default {
         console.error('Erreur:', err);
         alert('Erreur lors du chargement des commandes');
       } finally {
-        if (showLoading) {
-          this.loading = false;
-        }
+        // Toujours désactiver le loading, même si on a utilisé le cache
+        this.loading = false;
       }
     },
     
