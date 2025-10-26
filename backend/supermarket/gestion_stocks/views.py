@@ -1,6 +1,9 @@
 from django.shortcuts import render
 
 # Create your views here.
+from django.db.models import Count, Q
+from django.utils import timezone
+from datetime import timedelta
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response 
@@ -495,6 +498,270 @@ class AlertStockViewSet(viewsets.ModelViewSet):
     search_fields = ['message', 'produit__nom']
     ordering_fields = ['date_creation']
     ordering = ['-date_creation']
+
+    @action(detail=False, methods=['get'])
+    def par_produit(self, request):
+        """
+        Action pour récupérer les alertes groupées par produit.
+        GET /api/alertes/par-produit/list/
+        """
+        produit_id = request.query_params.get('produit_id')
+        
+        if produit_id:
+            alertes = self.queryset.filter(produit_id=produit_id)
+        else:
+            alertes = self.queryset.all()
+        
+        serializer = self.get_serializer(alertes, many=True)
+        return Response({
+            'nombre_alertes': alertes.count(),
+            'alertes': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def dashboard(self, request):
+        """
+        Endpoint pour le dashboard frontend avec statistiques des alertes.
+        GET /api/alertes/dashboard/
+        
+        Retourne:
+        - Nombre total d'alertes
+        - Alertes par priorité
+        - Alertes par type
+        - Alertes récentes (dernières 24h)
+        """
+        alertes = self.queryset.all()
+        
+        # Statistiques générales
+        stats = {
+            'total_alertes': alertes.count(),
+            'alertes_aujourdhui': alertes.filter(
+                date_creation__date=timezone.now().date()
+            ).count(),
+            'alertes_semaine': alertes.filter(
+                date_creation__gte=timezone.now() - timedelta(days=7)
+            ).count(),
+        }
+        
+        # Alertes par type (basé sur les mots-clés du message)
+        types_alertes = {
+            'stock_critique': alertes.filter(
+                Q(message__contains='STOCK CRITIQUE') | 
+                Q(message__contains='RUPTURE')
+            ).count(),
+            'peremption': alertes.filter(
+                Q(message__contains='PÉRIMÉ') | 
+                Q(message__contains='PÉREMPTION')
+            ).count(),
+            'commandes': alertes.filter(
+                message__contains='RETARD COMMANDE'
+            ).count(),
+            'forte_demande': alertes.filter(
+                message__contains='FORTE DEMANDE'
+            ).count(),
+            'prix': alertes.filter(
+                message__contains='PRIX'
+            ).count(),
+        }
+        
+        # Alertes par priorité (basé sur les emojis/mots-clés)
+        priorites = {
+            'critique': alertes.filter(
+                Q(message__contains='🔴') | 
+                Q(message__contains='⛔') |
+                Q(message__contains='CRITIQUE')
+            ).count(),
+            'haute': alertes.filter(
+                Q(message__contains='🟠') |
+                Q(message__contains='HAUTE')
+            ).count(),
+            'moyenne': alertes.filter(
+                Q(message__contains='🟡') | 
+                Q(message__contains='⚠️')
+            ).count(),
+            'basse': alertes.filter(
+                Q(message__contains='⏰') | 
+                Q(message__contains='BASSE')
+            ).count(),
+        }
+        
+        # Top 5 produits avec le plus d'alertes
+        top_produits_alertes = alertes.values(
+            'produit__nom', 
+            'produit__reference'
+        ).annotate(
+            nombre_alertes=Count('id_alert')
+        ).order_by('-nombre_alertes')[:5]
+        
+        return Response({
+            'statistiques': stats,
+            'par_type': types_alertes,
+            'par_priorite': priorites,
+            'top_produits': list(top_produits_alertes),
+            'timestamp': timezone.now()
+        })
+    
+    @action(detail=False, methods=['get'])
+    def critiques(self, request):
+        """
+        Récupérer uniquement les alertes critiques.
+        GET /api/alertes/critiques/list/
+        """
+        alertes_critiques = self.queryset.filter(
+            Q(message__contains='🔴') | 
+            Q(message__contains='⛔') |
+            Q(message__contains='CRITIQUE')
+        ).order_by('-date_creation')
+        
+        serializer = self.get_serializer(alertes_critiques, many=True)
+        return Response({
+            'nombre_alertes_critiques': alertes_critiques.count(),
+            'alertes': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def recentes(self, request):
+        """
+        Récupérer les alertes des dernières 24 heures.
+        GET /api/alertes/recentes/list/
+        """
+        date_limite = timezone.now() - timedelta(hours=24)
+        alertes_recentes = self.queryset.filter(
+            date_creation__gte=date_limite
+        ).order_by('-date_creation')
+        
+        serializer = self.get_serializer(alertes_recentes, many=True)
+        return Response({
+            'nombre_alertes': alertes_recentes.count(),
+            'periode': '24 heures',
+            'alertes': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def par_type(self, request):
+        """
+        Récupérer les alertes filtrées par type.
+        GET /api/alertes/par-type/list/?type=stock_critique
+        
+        Types disponibles:
+        - stock_critique
+        - peremption
+        - commandes
+        - forte_demande
+        - prix
+        """
+        type_alerte = request.query_params.get('type', '')
+        
+        filtres = {
+            'stock_critique': Q(message__contains='STOCK CRITIQUE') | Q(message__contains='RUPTURE'),
+            'peremption': Q(message__contains='PÉRIMÉ') | Q(message__contains='PÉREMPTION'),
+            'commandes': Q(message__contains='RETARD COMMANDE'),
+            'forte_demande': Q(message__contains='FORTE DEMANDE'),
+            'prix': Q(message__contains='PRIX'),
+        }
+        
+        if type_alerte not in filtres:
+            return Response(
+                {'erreur': f'Type invalide. Types disponibles: {", ".join(filtres.keys())}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        alertes = self.queryset.filter(filtres[type_alerte]).order_by('-date_creation')
+        serializer = self.get_serializer(alertes, many=True)
+        
+        return Response({
+            'type': type_alerte,
+            'nombre_alertes': alertes.count(),
+            'alertes': serializer.data
+        })
+    
+    @action(detail=False, methods=['get'])
+    def par_priorite(self, request):
+        """
+        Récupérer les alertes filtrées par priorité.
+        GET /api/alertes/par-priorite/list/?priorite=critique
+        
+        Priorités disponibles:
+        - critique (🔴, ⛔)
+        - haute (🟠)
+        - moyenne (🟡, ⚠️)
+        - basse (⏰)
+        """
+        priorite = request.query_params.get('priorite', '').lower()
+        
+        filtres_priorite = {
+            'critique': Q(message__contains='🔴') | Q(message__contains='⛔') | Q(message__contains='CRITIQUE'),
+            'haute': Q(message__contains='🟠') | Q(message__contains='HAUTE'),
+            'moyenne': Q(message__contains='🟡') | Q(message__contains='⚠️'),
+            'basse': Q(message__contains='⏰') | Q(message__contains='BASSE'),
+        }
+        
+        if priorite not in filtres_priorite:
+            return Response(
+                {'erreur': f'Priorité invalide. Priorités disponibles: {", ".join(filtres_priorite.keys())}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        alertes = self.queryset.filter(filtres_priorite[priorite]).order_by('-date_creation')
+        serializer = self.get_serializer(alertes, many=True)
+        
+        return Response({
+            'priorite': priorite,
+            'nombre_alertes': alertes.count(),
+            'alertes': serializer.data
+        })
+    
+    @action(detail=True, methods=['post'])
+    def marquer_resolue(self, request, pk=None):
+        """
+        Marquer une alerte comme résolue (la supprimer).
+        POST /api/alertes/{id}/marquer-resolue/
+        """
+        alerte = self.get_object()
+        produit_nom = alerte.produit.nom
+        alerte.delete()
+        
+        return Response({
+            'message': f'Alerte pour {produit_nom} marquée comme résolue',
+            'status': 'success'
+        }, status=status.HTTP_200_OK)
+    
+    @action(detail=False, methods=['post'])
+    def marquer_toutes_resolues(self, request):
+        """
+        Marquer toutes les alertes comme résolues (les supprimer).
+        POST /api/alertes/marquer-toutes-resolues/
+        Body optionnel: {"type": "stock_critique"} pour filtrer par type
+        """
+        type_filtre = request.data.get('type')
+        
+        if type_filtre:
+            filtres = {
+                'stock_critique': Q(message__contains='STOCK CRITIQUE') | Q(message__contains='RUPTURE'),
+                'peremption': Q(message__contains='PÉRIMÉ') | Q(message__contains='PÉREMPTION'),
+                'commandes': Q(message__contains='RETARD COMMANDE'),
+            }
+            
+            if type_filtre in filtres:
+                alertes = self.queryset.filter(filtres[type_filtre])
+            else:
+                return Response(
+                    {'erreur': 'Type de filtre invalide'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            alertes = self.queryset.all()
+        
+        nombre = alertes.count()
+        alertes.delete()
+        
+        return Response({
+            'message': f'{nombre} alerte(s) marquée(s) comme résolue(s)',
+            'nombre': nombre,
+            'status': 'success'
+        }, status=status.HTTP_200_OK)
+
+
 
     @action(detail=False, methods=['get'])
     def par_produit(self, request):
